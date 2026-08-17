@@ -153,7 +153,26 @@ export class PlayerUI {
     const sfSelect = this._$('soundfont-select');
     if (sfSelect) {
       sfSelect.addEventListener('change', async e => {
-        await this.player.setSoundfontBank(e.target.value);
+        const bankName = sfSelect.options[sfSelect.selectedIndex]?.text || e.target.value;
+        this._showLoading(`Loading bank: ${bankName}…`);
+        try {
+          await this.player.setSoundfontBank(e.target.value);
+          this._setTransportState('stopped');
+          const song = this.player._song;
+          if (song && song.positions.length > 0) {
+            const patIdx = song.positions[0] - 1;
+            this._updateGrid(song.patterns[patIdx], -1);
+            if (this._$('pos-fill')) this._$('pos-fill').style.width = '0%';
+            if (this._$('status-pos'))   this._$('status-pos').textContent   = `POS:001/${String(song.lastpos).padStart(3, '0')}`;
+            if (this._$('status-step'))  this._$('status-step').textContent  = `STEP:00/15`;
+            if (this._$('status-speed')) this._$('status-speed').textContent = `SPD:${song.startspeed}`;
+            if (this._$('status-track')) this._$('status-track').textContent = `PAT:${String(song.positions[0]).padStart(2, '0')}`;
+          }
+        } catch (err) {
+          this._showError(`Failed to load bank: ${err.message}`);
+        } finally {
+          this._hideLoading();
+        }
       });
     }
 

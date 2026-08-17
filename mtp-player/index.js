@@ -294,11 +294,22 @@ export class MTPPlayer extends EventTarget {
 
   /** @param {string} bankKey */
   async setSoundfontBank(bankKey) {
+    // 1. Stop current song and reset sequencer
+    this.stop();
+
+    // 2. Completely reset MIDI state and voices
+    this._synth.resetGM();
+
+    // 3. Switch bank DSP profile
     this._synth.setSoundfontBank(bankKey);
-    // Pre-warm instruments in the new soundfont
+
+    // 4. Immediately load all instruments needed for the current song in this bank
     if (this._song && this._initialized) {
       const programs = this._extractSongPrograms(this._song);
       await this._synth.preloadPrograms(programs);
+      if (this._synth._loading.size > 0) {
+        await Promise.allSettled([...this._synth._loading.values()]);
+      }
     }
   }
 

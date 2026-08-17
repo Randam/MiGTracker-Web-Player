@@ -202,6 +202,37 @@ const GM_NAMES = [
 ];
 
 /**
+ * Determine if a General MIDI program (0..127) is a continuous sustaining instrument
+ * (Strings, Flutes, Brass, Organs, Choirs, Pads, Synth Leads) that should loop.
+ * @param {number} prog
+ * @returns {boolean}
+ */
+export function isSustainedGMProgram(prog) {
+  // 16..23: Organs & Accordions
+  if (prog >= 16 && prog <= 23) return true;
+  // 40..44: Bowed Strings (Violin, Viola, Cello, Contrabass, Tremolo) - Excludes 45 (Pizzicato), 46 (Harp), 47 (Timpani)
+  if (prog >= 40 && prog <= 44) return true;
+  // 48..54: Ensembles, Choirs, Synth Voices - Excludes 55 (Orchestra Hit)
+  if (prog >= 48 && prog <= 54) return true;
+  // 56..63: Trumpets, Trombones, Tubas, French Horns, Brass Sections, Synth Brass
+  if (prog >= 56 && prog <= 63) return true;
+  // 64..71: Saxophones, Oboes, English Horns, Bassoons, Clarinets
+  if (prog >= 64 && prog <= 71) return true;
+  // 72..79: Piccolos, Flutes, Recorders, Pan Flutes, Whistles, Ocarinas
+  if (prog >= 72 && prog <= 79) return true;
+  // 80..87: Synth Leads (Square, Saw, Calliope, Chiff, Charang, Voice, 5ths, Bass+Lead)
+  if (prog >= 80 && prog <= 87) return true;
+  // 88..95: Synth Pads (New Age, Warm, PolySynth, Choir, Bowed, Metallic, Halo, Sweep)
+  if (prog >= 88 && prog <= 95) return true;
+  // 96..103: Synth FX (Atmosphere, Brightness, Sci-Fi)
+  if (prog >= 96 && prog <= 103) return true;
+  // 108..111: Bagpipe, Fiddle, Shanai
+  if (prog >= 108 && prog <= 111) return true;
+
+  return false;
+}
+
+/**
  * OPL3Synth — Real-time 2-Operator FM Synthesizer modeling the Yamaha YMF262 (OPL3)
  * chip found in Sound Blaster 16 / AdLib cards. 100% Web Audio, zero network requests.
  */
@@ -220,7 +251,7 @@ class OPL3Synth {
     mod.type = 'sine';
     mod.frequency.setValueAtTime(freq * params.mult, when);
 
-    const modPeak = freq * params.modIndex * (gain + 0.2);
+    const modPeak = freq * params.modIndex * (gain * 0.7 + 0.15);
     modGain.gain.setValueAtTime(modPeak, when);
     if (params.modDecay > 0) {
       modGain.gain.exponentialRampToValueAtTime(Math.max(1, modPeak * 0.2), when + params.modDecay);
@@ -236,12 +267,13 @@ class OPL3Synth {
 
     modGain.connect(car.frequency);
 
-    const peakGain = Math.min(1.0, gain * 0.9);
+    // Tamed, balanced output gain matching SoundFont levels (scaled by instrument family)
+    const peakGain = Math.min(0.38, gain * (params.volScale || 0.26));
     carGain.gain.setValueAtTime(peakGain, when);
 
     const decayTime = params.carDecay > 0 ? params.carDecay : 1.5;
     if (params.carDecay > 0) {
-      carGain.gain.exponentialRampToValueAtTime(0.001, when + decayTime);
+      carGain.gain.exponentialRampToValueAtTime(0.0001, when + decayTime);
     }
 
     car.connect(carGain);
@@ -268,7 +300,7 @@ class OPL3Synth {
           const t = Math.max(this.ctx.currentTime, stopWhen);
           carGain.gain.cancelScheduledValues(t);
           carGain.gain.setValueAtTime(carGain.gain.value, t);
-          carGain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+          carGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
           mod.stop(t + 0.05);
           car.stop(t + 0.05);
           setTimeout(cleanup, Math.max(20, (t - this.ctx.currentTime + 0.08) * 1000));
@@ -278,17 +310,89 @@ class OPL3Synth {
   }
 
   _getFMParams(prog) {
-    if (prog < 8) return { mult: 1, modIndex: 2.8, modDecay: 0.35, carDecay: 0.9 }; // Piano
-    if (prog >= 8 && prog < 16) return { mult: 3.5, modIndex: 4.0, modDecay: 0.2, carDecay: 0.6 }; // Chromatic/Bell
-    if (prog >= 16 && prog < 24) return { mult: 2.0, modIndex: 1.6, modDecay: 0.1, carDecay: 0 }; // Organ
-    if (prog >= 24 && prog < 32) return { mult: 3.0, modIndex: 3.8, modDecay: 0.18, carDecay: 0.7 }; // Guitar
-    if (prog >= 32 && prog < 40) return { mult: 0.5, modIndex: 3.5, modDecay: 0.25, carDecay: 0.55 }; // Bass
-    if (prog >= 40 && prog < 56) return { mult: 1.0, modIndex: 1.3, modDecay: 0.6, carDecay: 0 }; // Strings/Ensemble
-    if (prog >= 56 && prog < 64) return { mult: 1.0, modIndex: 4.5, modDecay: 0.45, carDecay: 0 }; // Brass
-    if (prog >= 64 && prog < 80) return { mult: 1.0, modIndex: 2.2, modDecay: 0.2, carDecay: 0 }; // Reed/Pipe
-    if (prog >= 80 && prog < 96) return { mult: 2.0, modIndex: 3.2, modDecay: 0.25, carDecay: 0 }; // Synth Lead
-    if (prog >= 96 && prog < 104) return { mult: 1.0, modIndex: 1.5, modDecay: 0.8, carDecay: 0 }; // Synth Pad
-    return { mult: 1.0, modIndex: 2.0, modDecay: 0.3, carDecay: 0.6 }; // FX / Ethnic
+    // ── 0..7: Piano & Keyboard Family ─────────────────────────────────────────
+    if (prog === 0 || prog === 1) return { mult: 1.0, modIndex: 1.8, modDecay: 0.35, carDecay: 0.90, volScale: 0.30 }; // Acoustic / Bright Grand
+    if (prog === 2 || prog === 3) return { mult: 2.0, modIndex: 2.2, modDecay: 0.25, carDecay: 0.75, volScale: 0.28 }; // Electric Grand / Honky-tonk
+    if (prog === 4 || prog === 5) return { mult: 1.0, modIndex: 3.5, modDecay: 0.40, carDecay: 0.85, volScale: 0.26 }; // Rhodes / DX7 FM Piano
+    if (prog === 6 || prog === 7) return { mult: 3.0, modIndex: 3.8, modDecay: 0.15, carDecay: 0.45, volScale: 0.26 }; // Harpsichord / Clavinet
+
+    // ── 8..15: Chromatic Percussion / Mallets ──────────────────────────────────
+    if (prog === 8 || prog === 9)  return { mult: 3.5, modIndex: 3.0, modDecay: 0.20, carDecay: 0.50, volScale: 0.24 }; // Celesta / Glockenspiel
+    if (prog === 10 || prog === 11) return { mult: 4.0, modIndex: 2.4, modDecay: 0.30, carDecay: 0.70, volScale: 0.24 }; // Music Box / Vibraphone
+    if (prog === 12 || prog === 13) return { mult: 2.75, modIndex: 2.0, modDecay: 0.08, carDecay: 0.25, volScale: 0.28 }; // Marimba / Xylophone
+    if (prog === 14 || prog === 15) return { mult: 5.0, modIndex: 3.8, modDecay: 0.45, carDecay: 1.20, volScale: 0.25 }; // Tubular Bells / Dulcimer
+
+    // ── 16..23: Organs & Accordions ───────────────────────────────────────────
+    if (prog === 16 || prog === 17) return { mult: 1.0, modIndex: 1.2, modDecay: 0, carDecay: 0, volScale: 0.24 }; // Drawbar / Percussive Organ
+    if (prog === 18 || prog === 19) return { mult: 2.0, modIndex: 1.5, modDecay: 0, carDecay: 0, volScale: 0.22 }; // Rock / Church Organ
+    if (prog >= 20 && prog <= 23)   return { mult: 3.0, modIndex: 1.4, modDecay: 0, carDecay: 0, volScale: 0.22 }; // Reed Organ / Accordion / Harmonica
+
+    // ── 24..31: Guitars ───────────────────────────────────────────────────────
+    if (prog === 24 || prog === 25) return { mult: 2.0, modIndex: 2.6, modDecay: 0.18, carDecay: 0.65, volScale: 0.28 }; // Nylon / Steel Guitar
+    if (prog === 26 || prog === 27) return { mult: 1.0, modIndex: 2.2, modDecay: 0.22, carDecay: 0.70, volScale: 0.28 }; // Jazz / Clean Guitar
+    if (prog === 28)                return { mult: 2.0, modIndex: 1.8, modDecay: 0.06, carDecay: 0.15, volScale: 0.30 }; // Muted Guitar
+    if (prog === 29 || prog === 30) return { mult: 1.0, modIndex: 4.8, modDecay: 0.50, carDecay: 0,    volScale: 0.22 }; // Overdrive / Distortion
+    if (prog === 31)                return { mult: 4.0, modIndex: 3.0, modDecay: 0.30, carDecay: 0.90, volScale: 0.26 }; // Guitar Harmonics
+
+    // ── 32..39: Basses ────────────────────────────────────────────────────────
+    if (prog >= 32 && prog <= 35)   return { mult: 0.5, modIndex: 2.2, modDecay: 0.18, carDecay: 0.60, volScale: 0.32 }; // Acoustic / Finger / Pick / Fretless Bass
+    if (prog === 36 || prog === 37) return { mult: 1.5, modIndex: 4.2, modDecay: 0.12, carDecay: 0.45, volScale: 0.30 }; // Slap Bass 1 & 2
+    if (prog === 38 || prog === 39) return { mult: 0.5, modIndex: 4.0, modDecay: 0.30, carDecay: 0.50, volScale: 0.30 }; // Synth Bass 1 & 2 (Classic OPL bass)
+
+    // ── 40..47: Solo Strings & Orchestral ─────────────────────────────────────
+    if (prog >= 40 && prog <= 43)   return { mult: 1.0, modIndex: 1.2, modDecay: 0,    carDecay: 0,    volScale: 0.24 }; // Violin, Viola, Cello, Contrabass
+    if (prog === 44)                return { mult: 2.0, modIndex: 1.5, modDecay: 0,    carDecay: 0,    volScale: 0.24 }; // Tremolo Strings
+    if (prog === 45)                return { mult: 3.0, modIndex: 2.8, modDecay: 0.08, carDecay: 0.35, volScale: 0.30 }; // Pizzicato Strings
+    if (prog === 46)                return { mult: 3.0, modIndex: 2.6, modDecay: 0.25, carDecay: 0.80, volScale: 0.28 }; // Orchestral Harp
+    if (prog === 47)                return { mult: 0.5, modIndex: 3.0, modDecay: 0.15, carDecay: 0.70, volScale: 0.32 }; // Timpani
+
+    // ── 48..55: Ensemble & Choirs ─────────────────────────────────────────────
+    if (prog === 48 || prog === 49) return { mult: 1.0, modIndex: 1.1, modDecay: 0,    carDecay: 0,    volScale: 0.22 }; // String Ensemble 1 & 2
+    if (prog === 50 || prog === 51) return { mult: 2.0, modIndex: 1.8, modDecay: 0,    carDecay: 0,    volScale: 0.22 }; // Synth Strings 1 & 2
+    if (prog >= 52 && prog <= 54)   return { mult: 1.0, modIndex: 0.8, modDecay: 0,    carDecay: 0,    volScale: 0.22 }; // Choir Aahs, Voice Oohs, Synth Voice
+    if (prog === 55)                return { mult: 2.0, modIndex: 4.5, modDecay: 0.15, carDecay: 0.35, volScale: 0.30 }; // Orchestra Hit
+
+    // ── 56..63: Brass ─────────────────────────────────────────────────────────
+    if (prog === 56 || prog === 57) return { mult: 1.0, modIndex: 3.2, modDecay: 0.35, carDecay: 0,    volScale: 0.24 }; // Trumpet / Trombone
+    if (prog === 58)                return { mult: 0.5, modIndex: 3.0, modDecay: 0.40, carDecay: 0,    volScale: 0.26 }; // Tuba
+    if (prog === 59)                return { mult: 2.0, modIndex: 3.8, modDecay: 0.20, carDecay: 0,    volScale: 0.22 }; // Muted Trumpet
+    if (prog === 60)                return { mult: 1.0, modIndex: 2.2, modDecay: 0.50, carDecay: 0,    volScale: 0.24 }; // French Horn
+    if (prog >= 61 && prog <= 63)   return { mult: 1.0, modIndex: 3.6, modDecay: 0.30, carDecay: 0,    volScale: 0.22 }; // Brass Section, Synth Brass 1 & 2
+
+    // ── 64..71: Reeds / Woodwinds ─────────────────────────────────────────────
+    if (prog >= 64 && prog <= 67)   return { mult: 2.0, modIndex: 2.5, modDecay: 0.25, carDecay: 0,    volScale: 0.24 }; // Soprano / Alto / Tenor / Baritone Sax
+    if (prog === 68 || prog === 69) return { mult: 3.0, modIndex: 2.2, modDecay: 0.15, carDecay: 0,    volScale: 0.22 }; // Oboe / English Horn
+    if (prog === 70 || prog === 71) return { mult: 1.0, modIndex: 1.8, modDecay: 0.20, carDecay: 0,    volScale: 0.24 }; // Bassoon / Clarinet
+
+    // ── 72..79: Pipes / Flutes ────────────────────────────────────────────────
+    if (prog === 72 || prog === 73) return { mult: 1.0, modIndex: 0.8, modDecay: 0.10, carDecay: 0,    volScale: 0.24 }; // Piccolo / Flute (Soft airy FM sine)
+    if (prog === 74 || prog === 75) return { mult: 1.0, modIndex: 1.0, modDecay: 0.15, carDecay: 0,    volScale: 0.24 }; // Recorder / Pan Flute
+    if (prog >= 76 && prog <= 79)   return { mult: 1.0, modIndex: 1.2, modDecay: 0.20, carDecay: 0,    volScale: 0.24 }; // Blown Bottle, Shakuhachi, Whistle, Ocarina
+
+    // ── 80..87: Synth Leads ───────────────────────────────────────────────────
+    if (prog === 80)                return { mult: 1.0, modIndex: 3.5, modDecay: 0,    carDecay: 0,    volScale: 0.22 }; // Lead 1 (Square)
+    if (prog === 81)                return { mult: 2.0, modIndex: 3.8, modDecay: 0,    carDecay: 0,    volScale: 0.22 }; // Lead 2 (Sawtooth)
+    if (prog === 82 || prog === 83) return { mult: 3.0, modIndex: 2.5, modDecay: 0.20, carDecay: 0,    volScale: 0.24 }; // Lead 3 (Calliope) / Lead 4 (Chiff)
+    if (prog === 84 || prog === 85) return { mult: 1.5, modIndex: 3.2, modDecay: 0.15, carDecay: 0,    volScale: 0.24 }; // Lead 5 (Charang) / Lead 6 (Voice)
+    if (prog === 86 || prog === 87) return { mult: 1.5, modIndex: 4.0, modDecay: 0.25, carDecay: 0,    volScale: 0.22 }; // Lead 7 (Fifths) / Lead 8 (Bass + Lead)
+
+    // ── 88..95: Synth Pads ────────────────────────────────────────────────────
+    if (prog >= 88 && prog <= 95)   return { mult: 1.0, modIndex: 1.2, modDecay: 0.80, carDecay: 0,    volScale: 0.20 }; // Warm, PolySynth, Choir, Metallic Pads
+
+    // ── 96..103: Synth FX ─────────────────────────────────────────────────────
+    if (prog >= 96 && prog <= 103)  return { mult: 3.5, modIndex: 3.0, modDecay: 0.50, carDecay: 0,    volScale: 0.22 }; // FX Rain, Crystal, Sci-Fi
+
+    // ── 104..111: Ethnic ──────────────────────────────────────────────────────
+    if (prog === 104 || prog === 105) return { mult: 3.0, modIndex: 4.0, modDecay: 0.18, carDecay: 0.70, volScale: 0.26 }; // Sitar / Banjo
+    if (prog === 106 || prog === 107) return { mult: 2.0, modIndex: 3.5, modDecay: 0.12, carDecay: 0.50, volScale: 0.26 }; // Shamisen / Koto
+    if (prog === 108 || prog === 109) return { mult: 4.0, modIndex: 2.5, modDecay: 0.20, carDecay: 0.60, volScale: 0.26 }; // Kalimba / Bagpipe
+    if (prog === 110 || prog === 111) return { mult: 2.0, modIndex: 2.2, modDecay: 0,    carDecay: 0,    volScale: 0.24 }; // Fiddle / Shanai
+
+    // ── 112..119: Percussive & Melodic Drums ──────────────────────────────────
+    if (prog >= 112 && prog <= 119) return { mult: 2.5, modIndex: 3.0, modDecay: 0.10, carDecay: 0.40, volScale: 0.28 }; // Tinkle Bell, Steel Drum, Taiko
+
+    // ── 120..127: Sound FX (Default fallback) ─────────────────────────────────
+    return { mult: 1.0, modIndex: 2.0, modDecay: 0.20, carDecay: 0.50, volScale: 0.25 };
   }
 }
 
@@ -1148,8 +1252,16 @@ export class MIDISynth {
     }
     if (!player) return;
 
-    // Play note naturally without hard duration cap
-    const node = player.play(note, when, { gain, destination: ch.gain });
+    // Play note with intelligent looping for sustained instruments (Strings, Flutes, Brass, Organs, Pads)
+    const shouldLoop = isSustainedGMProgram(ch.program);
+    const playOpts = {
+      gain,
+      destination: ch.gain,
+      loop: shouldLoop,
+      loopStart: shouldLoop ? 0.6 : 0,
+    };
+
+    const node = player.play(note, when, playOpts);
     if (node) {
       if (node.source) {
         node.source.onended = () => {
@@ -1301,6 +1413,37 @@ export class MIDISynth {
     if (this._masterGain) {
       this._masterGain.gain.cancelScheduledValues(now);
       this._masterGain.gain.setValueAtTime(0.85, now);
+    }
+  }
+
+  /** Completely reset MIDI synth state, voices, controllers, and cached soundfont instances. */
+  resetGM() {
+    this.silenceAll(0);
+    for (const player of this._players.values()) {
+      try { player.stop?.(); } catch { /* ignore */ }
+    }
+    this._players.clear();
+    this._loading.clear();
+
+    if (this._ctx) {
+      const now = this._ctx.currentTime;
+      for (let i = 0; i < 16; i++) {
+        const ch = this._channels[i];
+        if (ch) {
+          ch.program = i === 9 ? 128 : 0;
+          ch.volume = 1.0;
+          ch.pan = 0;
+          ch.activeNotes.clear();
+          if (ch.gain) {
+            ch.gain.gain.cancelScheduledValues(now);
+            ch.gain.gain.setValueAtTime(1.0, now);
+          }
+        }
+      }
+      if (this._masterGain) {
+        this._masterGain.gain.cancelScheduledValues(now);
+        this._masterGain.gain.setValueAtTime(0.85, now);
+      }
     }
   }
 
