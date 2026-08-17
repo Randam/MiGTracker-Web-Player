@@ -272,6 +272,45 @@ body {
   flex-shrink: 0;
 }
 
+.btn-load-song {
+  display:          flex;
+  align-items:      center;
+  gap:              var(--space-2);
+  height:           26px;
+  padding:          2px var(--space-3);
+  font-family:      var(--font-mono);
+  font-size:        var(--font-size-xs);
+  font-weight:      var(--font-weight-bold);
+  color:            var(--color-bg);
+  background-color: var(--color-amber);
+  border:           1px solid var(--color-amber);
+  border-radius:    var(--radius-sm);
+  cursor:           pointer;
+  letter-spacing:   0.05em;
+  text-transform:   uppercase;
+  user-select:      none;
+  transition:       background-color var(--transition-fast),
+                    color            var(--transition-fast),
+                    box-shadow       var(--transition-fast),
+                    transform        var(--transition-fast);
+  box-shadow:       0 0 8px rgba(255, 183, 0, 0.3);
+}
+
+.btn-load-song:hover {
+  background-color: #ffca28;
+  box-shadow:       0 0 14px rgba(255, 183, 0, 0.6);
+  transform:        translateY(-1px);
+}
+
+.btn-load-song:active {
+  transform:        translateY(1px);
+}
+
+.btn-load-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
 
 /* ==========================================================================
    3. #drop-zone — File drop area
@@ -1022,7 +1061,7 @@ body {
 .loading-overlay {
   position:         fixed;
   inset:            0;
-  z-index:          100;
+  z-index:          9999;
   background-color: var(--color-overlay-bg);
   display:          flex;
   flex-direction:   column;
@@ -1171,4 +1210,192 @@ body {
     padding:   var(--space-1) var(--space-2);
     font-size: var(--font-size-xs);
   }
+}
+
+/* ==========================================================================
+   Song Selector Modal
+   ========================================================================== */
+.modal-backdrop {
+  position:         fixed;
+  inset:            0;
+  background-color: rgba(0, 0, 0, 0.82);
+  backdrop-filter:  blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index:          1000;
+  display:          flex;
+  align-items:      center;
+  justify-content:  center;
+  padding:          var(--space-4);
+  opacity:          0;
+  visibility:       hidden;
+  transition:       opacity var(--transition-fast), visibility var(--transition-fast);
+}
+
+.modal-backdrop.is-open {
+  opacity:    1;
+  visibility: visible;
+}
+
+.modal-dialog {
+  display:          flex;
+  flex-direction:   column;
+  width:            100%;
+  max-width:        680px;
+  max-height:       85vh;
+  background-color: #0a140a;
+  border:           1px solid var(--color-phosphor);
+  border-radius:    var(--radius-md);
+  box-shadow:       0 0 35px rgba(57, 255, 20, 0.25), inset 0 0 15px rgba(0, 0, 0, 0.9);
+  overflow:         hidden;
+  animation:        modal-pop 0.15s ease-out;
+}
+
+@keyframes modal-pop {
+  from { transform: scale(0.96); opacity: 0; }
+  to   { transform: scale(1.0);  opacity: 1; }
+}
+
+.modal-header {
+  display:          flex;
+  align-items:      center;
+  justify-content:  space-between;
+  padding:          var(--space-3) var(--space-4);
+  background-color: #061006;
+  border-bottom:    1px solid var(--color-border);
+}
+
+.modal-title {
+  font-size:      var(--font-size-sm);
+  font-weight:    var(--font-weight-bold);
+  color:          var(--color-amber);
+  letter-spacing: 0.08em;
+}
+
+.modal-close-btn {
+  background:     transparent;
+  border:         1px solid var(--color-border);
+  color:          var(--color-text-dim);
+  font-family:    var(--font-mono);
+  font-size:      11px;
+  padding:        3px 8px;
+  border-radius:  var(--radius-sm);
+  cursor:         pointer;
+  transition:     all var(--transition-fast);
+}
+
+.modal-close-btn:hover {
+  border-color:     #ff4444;
+  color:            #ffffff;
+  background-color: rgba(255, 68, 68, 0.2);
+}
+
+.modal-search-wrap {
+  padding:          var(--space-3) var(--space-4);
+  background-color: #081208;
+  border-bottom:    1px solid var(--color-border-dim);
+}
+
+.modal-search-input {
+  width:            100%;
+  height:           32px;
+  padding:          0 var(--space-3);
+  font-family:      var(--font-mono);
+  font-size:        var(--font-size-xs);
+  color:            var(--color-phosphor);
+  background-color: #040804;
+  border:           1px solid var(--color-border);
+  border-radius:    var(--radius-sm);
+  outline:          none;
+  transition:       border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.modal-search-input:focus {
+  border-color: var(--color-phosphor);
+  box-shadow:   var(--glow-phosphor-sm);
+}
+
+.modal-songs-list {
+  flex:             1;
+  overflow-y:       auto;
+  max-height:       52vh;
+  padding:          var(--space-2);
+  display:          flex;
+  flex-direction:   column;
+  gap:              2px;
+}
+
+.modal-song-item {
+  display:          flex;
+  align-items:      center;
+  gap:              var(--space-3);
+  padding:          7px var(--space-3);
+  border-radius:    var(--radius-sm);
+  border:           1px solid transparent;
+  background-color: transparent;
+  color:            var(--color-text-primary);
+  font-family:      var(--font-mono);
+  font-size:        var(--font-size-xs);
+  cursor:           pointer;
+  text-align:       left;
+  user-select:      none;
+  transition:       background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.modal-song-item:hover,
+.modal-song-item:focus {
+  background-color: rgba(57, 255, 20, 0.12);
+  border-color:     var(--color-phosphor);
+  color:            #ffffff;
+  outline:          none;
+}
+
+.modal-song-idx {
+  color:          var(--color-text-dim);
+  font-size:      11px;
+  min-width:      28px;
+}
+
+.modal-song-name {
+  flex:           1;
+  color:          var(--color-phosphor);
+  font-weight:    var(--font-weight-medium);
+  white-space:    nowrap;
+  overflow:       hidden;
+  text-overflow:  ellipsis;
+}
+
+.modal-song-file {
+  color:          var(--color-amber);
+  font-size:      11px;
+  opacity:        0.85;
+}
+
+.modal-song-badge {
+  font-size:        10px;
+  color:            var(--color-text-dim);
+  background-color: #061006;
+  padding:          1px 5px;
+  border-radius:    2px;
+  border:           1px solid #142814;
+}
+
+.modal-footer {
+  padding:          var(--space-2) var(--space-4);
+  background-color: #061006;
+  border-top:       1px solid var(--color-border);
+  font-size:        11px;
+  color:            var(--color-text-dim);
+  display:          flex;
+  align-items:      center;
+  justify-content:  space-between;
+}
+
+.modal-footer kbd {
+  background:    #112211;
+  border:        1px solid #224422;
+  border-radius: 3px;
+  padding:       1px 4px;
+  color:         var(--color-amber);
+  font-family:   var(--font-mono);
+  font-size:     10px;
 }

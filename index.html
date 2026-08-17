@@ -27,9 +27,11 @@
       </div>
 
       <div class="header__right">
+        <button id="btn-open-songs" class="btn-load-song" title="Select a song from the library">
+          <span class="btn-load-icon">📂</span> LOAD SONG
+        </button>
         <div id="drop-zone" role="button" tabindex="0" aria-label="Drop an MTP file here or click to browse">
-          <span class="drop-icon">⊕ DROP .MTP FILE</span>
-          <small class="drop-sub">or click to browse</small>
+          <span class="drop-icon">⊕ DROP .MTP</span>
           <input type="file" id="file-input" accept=".mtp,.MTP" hidden />
         </div>
       </div>
@@ -135,6 +137,25 @@
   <div id="loading-overlay" class="loading-overlay" role="status" aria-live="polite">
     <div class="loading-overlay__spinner"></div>
     <div id="loading-text" class="loading-overlay__text">Initialising...</div>
+  </div>
+
+  <!-- ── Song Selector Modal ── -->
+  <div id="songs-modal" class="modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-title">📂 SELECT SONG TO LOAD</div>
+        <button id="btn-modal-close" class="modal-close-btn" aria-label="Close dialog">✕ ESC</button>
+      </div>
+      <div class="modal-search-wrap">
+        <input type="text" id="modal-search" class="modal-search-input" placeholder="🔍 Search songs by title or filename…" autocomplete="off" />
+      </div>
+      <div id="modal-songs-list" class="modal-songs-list" role="listbox" tabindex="0">
+        <!-- populated dynamically with 39 songs -->
+      </div>
+      <div class="modal-footer">
+        <span class="modal-hint">Select a song to load & play immediately • Press <kbd>ESC</kbd> to exit</span>
+      </div>
+    </div>
   </div>
 
   <!-- Player UI entry point (ES module) -->

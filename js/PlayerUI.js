@@ -34,6 +34,48 @@ const GM_NAMES = [
   'Breath Noise','Seashore','Bird','Telephone','Helicopter','Applause','Gun Shot',
 ];
 
+export const DEFAULT_SONGS = [
+  { file: 'Avalon01.mtp', name: 'Chapter change (Tracer/MiG 1998)', lastpos: 4, speed: 8 },
+  { file: 'Avalon02.mtp', name: 'The Village (Tracer/MiG 1997)', lastpos: 24, speed: 8 },
+  { file: 'Avalon03.mtp', name: "Mark's Weapons Shop (Tracer/MiG 1997)", lastpos: 28, speed: 8 },
+  { file: 'Avalon04.mtp', name: "Alfa's Shop (Tracer/MiG 1997)", lastpos: 58, speed: 8 },
+  { file: 'Avalon05.mtp', name: 'Avalon V / The Forest (Jer Der 1997)', lastpos: 25, speed: 8 },
+  { file: 'Avalon06.mtp', name: 'Attack ! (Jer Der/MiG 1997)', lastpos: 31, speed: 8 },
+  { file: 'Avalon07.mtp', name: 'Supermonster Attack (Jer Der/MiG 1998)', lastpos: 39, speed: 8 },
+  { file: 'Avalon08.mtp', name: 'Kreznjrk (Tracer/MiG 1997)', lastpos: 17, speed: 8 },
+  { file: 'Avalon09.mtp', name: 'Avalon IX / The Sea (Jer Der 1997)', lastpos: 18, speed: 7 },
+  { file: 'AVALON10.MTP', name: 'The Dark Room (Jer Der 1998)', lastpos: 34, speed: 7 },
+  { file: 'AVALON11.MTP', name: 'Castle Entrance (Jer Der 1998)', lastpos: 19, speed: 8 },
+  { file: 'Avalon12.mtp', name: 'Main Door Opened (Jer Der 1998)', lastpos: 6, speed: 8 },
+  { file: 'Avalon13.mtp', name: 'Avalon / Death (Tracer 1997)', lastpos: 7, speed: 6 },
+  { file: 'AVALON14.MTP', name: 'The Castle (Jer Der 1997)', lastpos: 29, speed: 8 },
+  { file: 'Avalon15.mtp', name: 'The Cave (Tracer/MiG 1997)', lastpos: 37, speed: 8 },
+  { file: 'AVALON16.MTP', name: 'Alien Village (Tracer/MiG 1998)', lastpos: 16, speed: 8 },
+  { file: 'AVALON17.MTP', name: 'Intro Demo Song for Avalon (Tracer/MiG 1998)', lastpos: 45, speed: 8 },
+  { file: 'AVALON18.MTP', name: 'The Cellar (Jer Der 1998)', lastpos: 12, speed: 7 },
+  { file: 'AVALON19.MTP', name: 'Avalon 19 (Tracer 1998)', lastpos: 16, speed: 8 },
+  { file: 'AVALON20.MTP', name: 'The Castle Garden (Jer Der/MiG 1998)', lastpos: 38, speed: 8 },
+  { file: 'AVALON21.MTP', name: 'Empty Village (Jer Der/MiG 1998)', lastpos: 16, speed: 7 },
+  { file: 'AVALON22.MTP', name: 'The Dark Passage (Jer Der 1998)', lastpos: 16, speed: 6 },
+  { file: 'AVALON23.MTP', name: 'The Mountains (Jer Der 1998)', lastpos: 35, speed: 8 },
+  { file: 'Avalon24.mtp', name: 'Avalon / The Beach (Jer Der 1997)', lastpos: 33, speed: 8 },
+  { file: 'Avalon25.mtp', name: 'The Dungeon (Tracer/MiG 1997)', lastpos: 37, speed: 7 },
+  { file: 'Avalon26.mtp', name: 'The Story of Avalon (Jer Der 1998)', lastpos: 57, speed: 7 },
+  { file: 'AVALON27.MTP', name: 'Avalon Rescued (Jer Der 1998)', lastpos: 33, speed: 8 },
+  { file: 'AVALON28.MTP', name: 'African Dance (Tracer 1998/MiG)', lastpos: 41, speed: 8 },
+  { file: 'AVALON29.MTP', name: 'Prologue (Jer Der 1998)', lastpos: 10, speed: 7 },
+  { file: 'AVALON30.MTP', name: 'The White Tower / Avalon 30 (Jer Der/MiG 1998)', lastpos: 62, speed: 8 },
+  { file: 'AVALON31.MTP', name: 'The White Tower (Jer Der 1998)', lastpos: 65, speed: 9 },
+  { file: 'AVALON32.MTP', name: 'Love (Tracer/MiG 1998)', lastpos: 60, speed: 6 },
+  { file: 'AVALON33.MTP', name: 'Avalon End (Jer Der 1997/1998)', lastpos: 36, speed: 8 },
+  { file: 'AVALON34.MTP', name: 'Avalon End (Jer Der 1997/1998)', lastpos: 36, speed: 8 },
+  { file: 'DARKLORD.MTP', name: 'Strings (Tracer/MiG 1998)', lastpos: 26, speed: 8 },
+  { file: 'ENDDEMO.MTP', name: 'The Flying Dutchman (Tracer/MiG 1998)', lastpos: 33, speed: 7 },
+  { file: 'FOUNTAIN.MTP', name: 'Enddemo (Tracer & Jer 1998)', lastpos: 39, speed: 6 },
+  { file: 'LABYRINT.MTP', name: 'Into the Labyrinth (Jer Der 1998)', lastpos: 74, speed: 9 },
+  { file: 'VOICE.MTP', name: 'Voice of Music - Avalon Theme (Tracer/MiG 1998)', lastpos: 40, speed: 8 },
+];
+
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
 /**
@@ -114,6 +156,7 @@ export class PlayerUI {
 
     this._bindDOM();
     this._buildGrid();
+    this._initSongModal();
   }
 
   // ── DOM helpers ──────────────────────────────────────────────────────────────
@@ -340,6 +383,100 @@ export class PlayerUI {
       this._showError(err.message);
     }
     if (!failed) this._hideLoading();
+  }
+
+  async _loadURL(url, songTitle) {
+    this._showLoading(`Loading ${songTitle || url}…`);
+    let failed = false;
+    try {
+      await this.player.loadFromURL(url);
+    } catch (err) {
+      failed = true;
+      console.error('[MTPPlayer]', err);
+      this._showError(err.message);
+    }
+    if (!failed) this._hideLoading();
+  }
+
+  _initSongModal() {
+    const modal = this._$('songs-modal');
+    const openBtn = this._$('btn-open-songs');
+    const closeBtn = this._$('btn-modal-close');
+    const searchInput = this._$('modal-search');
+    const listEl = this._$('modal-songs-list');
+    if (!modal || !openBtn || !listEl) return;
+
+    const renderList = (filterText = '') => {
+      listEl.innerHTML = '';
+      const query = filterText.trim().toLowerCase();
+      const filtered = DEFAULT_SONGS.filter(s => {
+        if (!query) return true;
+        return s.file.toLowerCase().includes(query) || s.name.toLowerCase().includes(query);
+      });
+
+      if (filtered.length === 0) {
+        const emptyEl = document.createElement('div');
+        emptyEl.className = 'modal-song-empty';
+        emptyEl.style.padding = '20px';
+        emptyEl.style.textAlign = 'center';
+        emptyEl.style.color = 'var(--color-text-dim)';
+        emptyEl.textContent = 'No matching songs found.';
+        listEl.appendChild(emptyEl);
+        return;
+      }
+
+      filtered.forEach((song, idx) => {
+        const item = document.createElement('button');
+        item.className = 'modal-song-item';
+        item.setAttribute('type', 'button');
+        item.innerHTML = `
+          <span class="modal-song-idx">[${String(idx + 1).padStart(2, '0')}]</span>
+          <span class="modal-song-name">${song.name}</span>
+          <span class="modal-song-file">${song.file}</span>
+          <span class="modal-song-badge">POS:${song.lastpos}</span>
+          <span class="modal-song-badge">SPD:${song.speed}</span>
+        `;
+        item.addEventListener('click', async () => {
+          this._closeSongModal();
+          await this._loadURL(`./songs/${song.file}`, song.name);
+          await this._onPlay();
+        });
+        listEl.appendChild(item);
+      });
+    };
+
+    const openModal = () => {
+      modal.classList.add('is-open');
+      modal.setAttribute('aria-hidden', 'false');
+      if (searchInput) {
+        searchInput.value = '';
+        setTimeout(() => searchInput.focus(), 50);
+      }
+      renderList('');
+    };
+
+    const closeModal = () => {
+      modal.classList.remove('is-open');
+      modal.setAttribute('aria-hidden', 'true');
+    };
+
+    this._closeSongModal = closeModal;
+
+    openBtn.addEventListener('click', openModal);
+    closeBtn?.addEventListener('click', closeModal);
+    modal.addEventListener('click', e => {
+      if (e.target === modal) closeModal();
+    });
+
+    searchInput?.addEventListener('input', e => {
+      renderList(e.target.value);
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && modal.classList.contains('is-open')) {
+        closeModal();
+      }
+    });
   }
 
   _onLoaded({ songname, lastpos }) {
