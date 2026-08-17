@@ -1,22 +1,36 @@
 /**
- * MIDISynth — Web Audio GM synthesizer using soundfont-player samples.
+ * MIDISynth — Web Audio GM synthesizer with multi-soundfont selection + built-in fallback drum synth.
  *
- * Wraps the soundfont-player library (https://github.com/danigb/soundfont-player)
- * which loads pre-rendered GM audio samples from the gleitz/midi-js-soundfonts CDN
- * (FluidR3_GM — closest browser equivalent to the original SB AWE32/64 SF2 bank).
- *
- * soundfont-player can be provided in two ways:
- *   1. CDN script tag (standalone player):  <script src="soundfont-player.js">
- *      → available as window.Soundfont
- *   2. npm install soundfont-player (Vite/bundler projects like Avalon Remake):
- *      → resolved via dynamic import('soundfont-player')
- *
- * The library handles whichever is available automatically.
+ * Supported SoundFont banks:
+ *   1. 'fatboy' (SoundBlaster AWE32 / 90s Vintage): Classic 90s DOS Sound Blaster AWE32 / EMU8000 timbre.
+ *   2. 'fluidr3' (FluidR3 GM / AWE64 Gold SF2): High quality General MIDI SF2 soundfont bank.
+ *   3. 'musyngkite' (MusyngKite Studio HD): High dynamic range orchestral & studio acoustic bank.
  */
+
+export const SOUNDFONT_BANKS = {
+  fatboy: {
+    id: 'FatBoy',
+    name: 'SoundBlaster AWE32 (Vintage 90s)',
+    desc: 'Classic 90s DOS Sound Blaster AWE32 / EMU8000 ROM timbre',
+    baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/',
+  },
+  fluidr3: {
+    id: 'FluidR3_GM',
+    name: 'FluidR3 GM (AWE64 Gold SF2)',
+    desc: 'Rich 90s/2000s General MIDI SoundFont 2 (Clean & Warm)',
+    baseUrl: 'https://paulrosen.github.io/midi-js-soundfonts/FluidR3_GM/',
+  },
+  musyngkite: {
+    id: 'MusyngKite',
+    name: 'MusyngKite (Studio HD)',
+    desc: 'High dynamic range orchestral & studio acoustic bank',
+    baseUrl: 'https://paulrosen.github.io/midi-js-soundfonts/MusyngKite/',
+  },
+};
+
 /**
- * GM instrument names in the exact format used by gleitz/midi-js-soundfonts CDN filenames.
- * soundfont-player's nameToUrl does NOT convert numbers — we must resolve the name ourselves.
- * Index 0-127 = GM program (0-based). Index 128 = percussion stand-in.
+ * GM instrument names in the exact format used by midi-js-soundfonts CDN filenames.
+ * Index 0-127 = GM program (0-based).
  */
 const GM_NAMES = [
   'acoustic_grand_piano','bright_acoustic_piano','electric_grand_piano','honky-tonk_piano',
@@ -49,21 +63,378 @@ const GM_NAMES = [
   'synth_drum','reverse_cymbal',
   'guitar_fret_noise','breath_noise','seashore','bird_tweet','telephone_ring',
   'helicopter','applause','gunshot',
-  // index 128 = percussion channel stand-in
-  'taiko_drum',
 ];
+
+/**
+ * GMDrumSynth — Built-in General MIDI Drum Synthesizer for channel 9.
+ */
+class GMDrumSynth {
+  constructor(ctx) {
+    this.ctx = ctx;
+    this._noiseBuffer = null;
+    this._initNoise();
+  }
+
+  _initNoise() {
+    const bufferSize = this.ctx.sampleRate * 2;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    this._noiseBuffer = buffer;
+  }
+
+  play(note, time, velocityGain, destination) {
+    const when = Math.max(this.ctx.currentTime, time);
+    const gain = Math.max(0, Math.min(1.5, velocityGain));
+
+    switch (note) {
+      case 35: // Acoustic Bass Drum
+      case 36: // Bass Drum 1 (Kick)
+        this._playKick(when, gain, destination, note === 35 ? 130 : 155);
+        break;
+
+      case 37: // Side Stick
+        this._playRimshot(when, gain, destination);
+        break;
+
+      case 38: // Acoustic Snare
+      case 40: // Electric Snare
+        this._playSnare(when, gain, destination, note === 40);
+        break;
+
+      case 39: // Hand Clap
+        this._playClap(when, gain, destination);
+        break;
+
+      case 42: // Closed Hi-Hat
+      case 44: // Pedal Hi-Hat
+        this._playHiHat(when, gain * 0.8, destination, false);
+        break;
+
+      case 46: // Open Hi-Hat
+        this._playHiHat(when, gain * 0.9, destination, true);
+        break;
+
+      case 41: // Low Floor Tom
+      case 43: // High Floor Tom
+      case 45: // Low Tom
+      case 47: // Low-Mid Tom
+      case 48: // Hi-Mid Tom
+      case 50: // High Tom
+        this._playTom(when, gain, destination, note);
+        break;
+
+      case 49: // Crash Cymbal 1
+      case 57: // Crash Cymbal 2
+      case 52: // Chinese Cymbal
+      case 55: // Splash Cymbal
+        this._playCrash(when, gain, destination);
+        break;
+
+      case 51: // Ride Cymbal 1
+      case 59: // Ride Cymbal 2
+      case 53: // Ride Bell
+        this._playRide(when, gain, destination);
+        break;
+
+      case 56: // Cowbell
+        this._playCowbell(when, gain, destination);
+        break;
+
+      case 54: // Tambourine
+      case 69: // Cabasa
+      case 70: // Maracas
+        this._playShaker(when, gain, destination);
+        break;
+
+      case 75: // Claves
+      case 76: // Hi Wood Block
+      case 77: // Low Wood Block
+        this._playWoodblock(when, gain, destination, note);
+        break;
+
+      default:
+        this._playGenericPercussion(when, gain, destination, note);
+        break;
+    }
+  }
+
+  _playKick(when, gain, dest, startFreq = 155) {
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(startFreq, when);
+    osc.frequency.exponentialRampToValueAtTime(32, when + 0.12);
+
+    g.gain.setValueAtTime(gain * 1.3, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.35);
+
+    const clickOsc = this.ctx.createOscillator();
+    const clickGain = this.ctx.createGain();
+    clickOsc.type = 'triangle';
+    clickOsc.frequency.setValueAtTime(320, when);
+    clickOsc.frequency.exponentialRampToValueAtTime(40, when + 0.02);
+    clickGain.gain.setValueAtTime(gain * 0.8, when);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, when + 0.02);
+
+    clickOsc.connect(clickGain);
+    clickGain.connect(dest);
+    clickOsc.start(when);
+    clickOsc.stop(when + 0.025);
+
+    osc.connect(g);
+    g.connect(dest);
+    osc.start(when);
+    osc.stop(when + 0.36);
+  }
+
+  _playSnare(when, gain, dest, isElectric = false) {
+    const osc = this.ctx.createOscillator();
+    const oscGain = this.ctx.createGain();
+    osc.type = isElectric ? 'triangle' : 'sine';
+    osc.frequency.setValueAtTime(isElectric ? 220 : 180, when);
+    osc.frequency.exponentialRampToValueAtTime(80, when + 0.1);
+    oscGain.gain.setValueAtTime(gain * 0.7, when);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, when + 0.15);
+    osc.connect(oscGain);
+    oscGain.connect(dest);
+    osc.start(when);
+    osc.stop(when + 0.16);
+
+    if (this._noiseBuffer) {
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this._noiseBuffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(1000, when);
+
+      const noiseGain = this.ctx.createGain();
+      noiseGain.gain.setValueAtTime(gain * 0.9, when);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, when + 0.22);
+
+      noise.connect(filter);
+      filter.connect(noiseGain);
+      noiseGain.connect(dest);
+      noise.start(when);
+      noise.stop(when + 0.23);
+    }
+  }
+
+  _playHiHat(when, gain, dest, isOpen) {
+    if (!this._noiseBuffer) return;
+    const dur = isOpen ? 0.35 : 0.06;
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(8500, when);
+    filter.Q.value = 3.0;
+
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(gain * 0.8, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + dur);
+
+    noise.connect(filter);
+    filter.connect(g);
+    g.connect(dest);
+    noise.start(when);
+    noise.stop(when + dur + 0.01);
+  }
+
+  _playCrash(when, gain, dest) {
+    if (!this._noiseBuffer) return;
+    const dur = 1.2;
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(5000, when);
+
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(gain * 0.8, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + dur);
+
+    noise.connect(filter);
+    filter.connect(g);
+    g.connect(dest);
+    noise.start(when);
+    noise.stop(when + dur + 0.01);
+  }
+
+  _playRide(when, gain, dest) {
+    const osc1 = this.ctx.createOscillator();
+    const oscGain = this.ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(3100, when);
+    oscGain.gain.setValueAtTime(gain * 0.3, when);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, when + 0.6);
+    osc1.connect(oscGain);
+    oscGain.connect(dest);
+    osc1.start(when);
+    osc1.stop(when + 0.61);
+
+    if (this._noiseBuffer) {
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this._noiseBuffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(9000, when);
+      filter.Q.value = 4.0;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(gain * 0.4, when);
+      g.gain.exponentialRampToValueAtTime(0.001, when + 0.5);
+      noise.connect(filter);
+      filter.connect(g);
+      g.connect(dest);
+      noise.start(when);
+      noise.stop(when + 0.51);
+    }
+  }
+
+  _playTom(when, gain, dest, note) {
+    const tomFreqs = { 41: 85, 43: 98, 45: 110, 47: 125, 48: 140, 50: 165 };
+    const baseFreq = tomFreqs[note] || 110;
+
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(baseFreq * 1.8, when);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq, when + 0.08);
+
+    g.gain.setValueAtTime(gain * 0.9, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.28);
+
+    osc.connect(g);
+    g.connect(dest);
+    osc.start(when);
+    osc.stop(when + 0.29);
+  }
+
+  _playRimshot(when, gain, dest) {
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(450, when);
+    g.gain.setValueAtTime(gain * 0.7, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.04);
+    osc.connect(g);
+    g.connect(dest);
+    osc.start(when);
+    osc.stop(when + 0.045);
+  }
+
+  _playClap(when, gain, dest) {
+    if (!this._noiseBuffer) return;
+    [0, 0.012, 0.024].forEach((offset, idx) => {
+      const isLast = (idx === 2);
+      const dur = isLast ? 0.15 : 0.015;
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this._noiseBuffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1200, when + offset);
+      filter.Q.value = 1.5;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(gain * 0.8, when + offset);
+      g.gain.exponentialRampToValueAtTime(0.001, when + offset + dur);
+      noise.connect(filter);
+      filter.connect(g);
+      g.connect(dest);
+      noise.start(when + offset);
+      noise.stop(when + offset + dur + 0.01);
+    });
+  }
+
+  _playCowbell(when, gain, dest) {
+    [587, 845].forEach(freq => {
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, when);
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(freq, when);
+      filter.Q.value = 5.0;
+      g.gain.setValueAtTime(gain * 0.5, when);
+      g.gain.exponentialRampToValueAtTime(0.001, when + 0.2);
+      osc.connect(filter);
+      filter.connect(g);
+      g.connect(dest);
+      osc.start(when);
+      osc.stop(when + 0.21);
+    });
+  }
+
+  _playShaker(when, gain, dest) {
+    if (!this._noiseBuffer) return;
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(7000, when);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(gain * 0.6, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.06);
+    noise.connect(filter);
+    filter.connect(g);
+    g.connect(dest);
+    noise.start(when);
+    noise.stop(when + 0.07);
+  }
+
+  _playWoodblock(when, gain, dest, note) {
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(note === 76 ? 900 : 700, when);
+    g.gain.setValueAtTime(gain * 0.8, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.05);
+    osc.connect(g);
+    g.connect(dest);
+    osc.start(when);
+    osc.stop(when + 0.055);
+  }
+
+  _playGenericPercussion(when, gain, dest, note) {
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = 'sine';
+    const freq = 120 + ((note % 24) * 20);
+    osc.frequency.setValueAtTime(freq * 1.5, when);
+    osc.frequency.exponentialRampToValueAtTime(freq, when + 0.05);
+    g.gain.setValueAtTime(gain * 0.7, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.15);
+    osc.connect(g);
+    g.connect(dest);
+    osc.start(when);
+    osc.stop(when + 0.16);
+  }
+}
 
 export class MIDISynth {
 
-  constructor({ soundfontUrl = 'FluidR3_GM', soundfontFormat = 'mp3' } = {}) {
-    this._soundfontUrl    = soundfontUrl;
+  constructor({
+    soundfontBank = 'fatboy',      // default: SoundBlaster AWE32 / 90s vintage
+    soundfontFormat = 'mp3',
+    percussionMode = 'soundfont',  // 'soundfont' (SF2 samples) or 'synth'
+  } = {}) {
+    this._soundfontBank   = SOUNDFONT_BANKS[soundfontBank] ? soundfontBank : 'fatboy';
     this._soundfontFormat = soundfontFormat;
+    this._percussionMode  = percussionMode;
     this._SF              = null;  // soundfont-player library reference
     this._ctx             = null;  // AudioContext
     this._masterGain      = null;  // master output gain
     this._players         = new Map();  // GM program → soundfont player instance
     this._channels        = [];         // per-channel state
     this._loading         = new Map();  // in-flight load promises (dedup)
+    this._drumSynth       = null;       // built-in GM drum synthesizer
   }
 
   // ── Initialisation ──────────────────────────────────────────────────────────
@@ -79,6 +450,7 @@ export class MIDISynth {
     this._masterGain.gain.value = 0.85;
     this._masterGain.connect(this._ctx.destination);
 
+    this._drumSynth = new GMDrumSynth(this._ctx);
     this._SF = await this._resolveSoundfontLib();
 
     // 16 MIDI channels: each has its own gain node + state
@@ -96,16 +468,15 @@ export class MIDISynth {
       };
     }
 
-    // Pre-load percussion — it's always needed
-    this._preload(128).catch(() => {});
+    if (this._percussionMode === 'soundfont') {
+      this._preload(128).catch(() => {});
+    }
   }
 
   /** Try to locate the soundfont-player library. */
   async _resolveSoundfontLib() {
-    // 1. CDN global (standalone player with <script> tag)
     if (typeof globalThis.Soundfont !== 'undefined') return globalThis.Soundfont;
 
-    // 2. npm package (Vite / bundler projects)
     try {
       const mod = await import('soundfont-player');
       return mod.default || mod;
@@ -116,6 +487,27 @@ export class MIDISynth {
       '  Standalone player: add <script src="https://cdn.jsdelivr.net/npm/soundfont-player/dist/soundfont-player.min.js"></script>\n' +
       '  Vite/npm project: run  npm install soundfont-player'
     );
+  }
+
+  // ── SoundFont Bank Selection ────────────────────────────────────────────────
+
+  /**
+   * Switch the active SoundFont bank (e.g. 'fatboy', 'fluidr3', 'musyngkite').
+   * @param {string} bankKey
+   */
+  setSoundfontBank(bankKey) {
+    if (!SOUNDFONT_BANKS[bankKey]) return;
+    this._soundfontBank = bankKey;
+    // Clear instrument cache so new bank samples load for melodic programs
+    this._players.clear();
+    this._loading.clear();
+    if (this._percussionMode === 'soundfont') {
+      this._preload(128).catch(() => {});
+    }
+  }
+
+  get soundfontBank() {
+    return this._soundfontBank;
   }
 
   // ── Instrument loading ──────────────────────────────────────────────────────
@@ -135,25 +527,50 @@ export class MIDISynth {
     if (this._loading.has(program)) return this._loading.get(program);
     if (this._players.has(program)) return Promise.resolve(this._players.get(program));
 
-    // Resolve to the exact filename string gleitz CDN expects.
-    // soundfont-player's nameToUrl concatenates the name directly — no number conversion.
-    const name = GM_NAMES[program] ?? GM_NAMES[0];
+    // Program 128 = percussion soundfont
+    const isPercussion = (program === 128);
+    const name = isPercussion ? 'percussion' : (GM_NAMES[program] ?? GM_NAMES[0]);
+    const bank = SOUNDFONT_BANKS[this._soundfontBank] || SOUNDFONT_BANKS.fatboy;
 
     const promise = this._SF.instrument(this._ctx, name, {
-      soundfont: this._soundfontUrl,   // 'FluidR3_GM'
-      format:    this._soundfontFormat, // 'mp3'
+      soundfont: bank.id,
+      format:    this._soundfontFormat,
+      nameToUrl: (n, sf, fmt) => {
+        if (n === 'percussion') {
+          // Verified FluidR3_GM percussion SF2 soundfont
+          return `https://paulrosen.github.io/midi-js-soundfonts/FluidR3_GM/percussion-${fmt}.js`;
+        }
+        return `${bank.baseUrl}${n}-${fmt}.js`;
+      },
     }).then(player => {
       this._players.set(program, player);
       this._loading.delete(program);
       return player;
     }).catch(err => {
       this._loading.delete(program);
-      console.warn(`MIDISynth: could not load instrument ${program} ("${name}"):`, err.message);
+      console.warn(`MIDISynth: could not load soundfont instrument ${program} ("${name}"):`, err.message);
       return null;
     });
 
     this._loading.set(program, promise);
     return promise;
+  }
+
+  // ── Percussion Mode ──────────────────────────────────────────────────────────
+
+  /**
+   * Set percussion mode: 'soundfont' (SF2 sample bank) or 'synth' (Web Audio synth).
+   * @param {'soundfont'|'synth'} mode
+   */
+  setPercussionMode(mode) {
+    this._percussionMode = mode === 'synth' ? 'synth' : 'soundfont';
+    if (this._percussionMode === 'soundfont') {
+      this._preload(128).catch(() => {});
+    }
+  }
+
+  get percussionMode() {
+    return this._percussionMode;
   }
 
   // ── MIDI event handlers ─────────────────────────────────────────────────────
@@ -169,15 +586,30 @@ export class MIDISynth {
     const ch = this._channels[channel];
     if (!ch) return;
 
-    // Resolve instrument first — this may take time on first load
-    const player = await this._getPlayer(ch.program);
-    if (!player) return;
-
-    // Compute `when` AFTER the await so we never schedule in the past
     const when = Math.max(this._ctx.currentTime + 0.005, time || 0);
     const gain = (velocity / 127) * ch.volume;
 
-    // Stop any existing note on this pitch first
+    // ── Channel 9 = General MIDI Percussion ──────────────────────────────────
+    if (channel === 9) {
+      if (this._percussionMode === 'soundfont') {
+        const drumPlayer = await this._getPlayer(128);
+        if (drumPlayer) {
+          const node = drumPlayer.play(note, when, { gain, destination: ch.gain });
+          if (node) ch.activeNotes.set(note, node);
+          return;
+        }
+      }
+      // Fallback or explicit 'synth' mode
+      if (this._drumSynth) {
+        this._drumSynth.play(note, when, gain, ch.gain);
+      }
+      return;
+    }
+
+    // ── Melodic instrument channels (0..8, 10..15) ──────────────────────────
+    const player = await this._getPlayer(ch.program);
+    if (!player) return;
+
     this._stopNote(ch, note, when);
 
     const node = player.play(note, when, { gain, destination: ch.gain });
@@ -191,6 +623,7 @@ export class MIDISynth {
    * @param {number} [time]
    */
   noteOff(channel, note, time = 0) {
+    if (channel === 9 && this._percussionMode === 'synth') return;
     const ch = this._channels[channel];
     if (!ch) return;
     this._stopNote(ch, note, time || this._ctx.currentTime);
@@ -209,33 +642,31 @@ export class MIDISynth {
     if (!ch) return;
 
     switch (cc) {
-      case 7:   // Channel volume
+      case 7: // Channel Volume (0–127)
         ch.volume = value / 127;
-        ch.gain.gain.setTargetAtTime(ch.volume, this._ctx.currentTime, 0.01);
+        if (ch.gain) {
+          ch.gain.gain.setTargetAtTime(ch.volume, this._ctx.currentTime, 0.01);
+        }
         break;
-      case 10:  // Pan
-        ch.pan = (value - 64) / 63; // −1..+1
-        // Note: soundfont-player doesn't expose per-note panning via AudioNode,
-        // so we apply pan as a subtle gain offset for now.
+
+      case 10: // Pan (0–127; 64 = center)
+        ch.pan = (value - 64) / 64;
         break;
-      case 1:   // Modulation — no-op for sample-based playback
-        break;
+
+      case 120: // All Sound Off
       case 123: // All Notes Off
         this.silenceChannel(channel);
         break;
     }
   }
 
-  /**
-   * Change the active GM instrument on a channel.
-   * Pre-loads the new instrument in the background for zero-latency playback.
-   */
+  /** Change the instrument program on a channel. */
   programChange(channel, program) {
+    if (channel === 9) return;
     const ch = this._channels[channel];
-    if (!ch || channel === 9) return; // ch 9 always percussion
-    if (ch.program === program) return;
-    ch.program = Math.max(0, Math.min(127, program));
-    this._preload(ch.program).catch(() => {});
+    if (!ch) return;
+    ch.program = program;
+    this._preload(program).catch(() => {});
   }
 
   /** Stop all active notes on a channel immediately. */
@@ -254,7 +685,7 @@ export class MIDISynth {
   // ── Volume / state ──────────────────────────────────────────────────────────
 
   setMasterVolume(vol) {
-    if (this._masterGain)
+    if (this._masterGain && this._ctx)
       this._masterGain.gain.setTargetAtTime(Math.max(0, Math.min(1, vol)), this._ctx.currentTime, 0.02);
   }
 
@@ -268,6 +699,9 @@ export class MIDISynth {
    */
   preloadPrograms(programs) {
     for (const p of programs) this._preload(p).catch(() => {});
+    if (this._percussionMode === 'soundfont') {
+      this._preload(128).catch(() => {});
+    }
   }
 
   get audioContext() { return this._ctx; }

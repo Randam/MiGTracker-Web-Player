@@ -21,7 +21,9 @@
 
 import { MTPParser }    from './MTPParser.js';
 import { MTPSequencer } from './MTPSequencer.js';
-import { MIDISynth }    from './MIDISynth.js';
+import { MIDISynth, SOUNDFONT_BANKS } from './MIDISynth.js';
+
+export { SOUNDFONT_BANKS };
 
 export { MTPParser, MTPSequencer, MIDISynth };
 
@@ -224,6 +226,33 @@ export class MTPPlayer extends EventTarget {
     if (this._song) {
       this._song.looppos = loop ? this._song._originalLooppos ?? this._song.looppos : 0;
     }
+  }
+
+  /** @param {'soundfont'|'synth'} mode */
+  setPercussionMode(mode) {
+    this._synth.setPercussionMode(mode);
+  }
+
+  get percussionMode() {
+    return this._synth.percussionMode;
+  }
+
+  /** @param {string} bankKey  'fatboy' | 'fluidr3' | 'musyngkite' */
+  setSoundfontBank(bankKey) {
+    this._synth.setSoundfontBank(bankKey);
+    // Pre-warm instruments in the new soundfont
+    if (this._song && this._initialized) {
+      const programs = new Set();
+      for (const def of this._song.channelDefs) {
+        if (def.startvoice > 0) programs.add(def.startvoice - 1);
+      }
+      for (const v of this._song.voicechange) if (v > 0) programs.add(v - 1);
+      this._synth.preloadPrograms([...programs]);
+    }
+  }
+
+  get soundfontBank() {
+    return this._synth.soundfontBank;
   }
 
   // ── Event system ─────────────────────────────────────────────────────────────

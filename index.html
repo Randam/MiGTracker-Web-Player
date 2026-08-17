@@ -69,6 +69,17 @@
         <label for="btn-loop" class="transport__loop-label">↺ LOOP</label>
       </div>
 
+      <button id="btn-drum-mode" class="transport__btn" title="Toggle Percussion Mode (SoundFont samples vs Web Audio synth)">🥁 DRUMS: SF2</button>
+
+      <div class="transport__bank-select">
+        <label for="soundfont-select" class="transport__label">BANK</label>
+        <select id="soundfont-select" class="transport__select" title="Choose SoundFont Bank">
+          <option value="fatboy" selected>💾 SoundBlaster AWE32 (Vintage 90s)</option>
+          <option value="fluidr3">🔊 FluidR3 GM (AWE64 Gold SF2)</option>
+          <option value="musyngkite">🎼 MusyngKite (Studio HD)</option>
+        </select>
+      </div>
+
       <div class="transport__volume">
         <span class="transport__label">VOL</span>
         <input type="range" id="vol-slider" min="0" max="100" value="85" class="transport__slider" />
