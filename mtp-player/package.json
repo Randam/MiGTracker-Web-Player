@@ -1,0 +1,21 @@
+{
+  "name": "mtp-player",
+  "version": "1.0.0",
+  "description": "Browser-based replayer for MiGTracker Pro (.MTP) music files. ES Module, no bundler required.",
+  "type": "module",
+  "main": "index.js",
+  "module": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "keywords": ["music", "tracker", "midi", "mtp", "web-audio", "general-midi"],
+  "license": "MIT",
+  "peerDependencies": {
+    "soundfont-player": "^0.12.0"
+  },
+  "peerDependenciesMeta": {
+    "soundfont-player": {
+      "optional": true
+    }
+  }
+}

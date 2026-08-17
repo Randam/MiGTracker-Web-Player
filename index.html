@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MiGTracker Web Player</title>
+  <link rel="icon" href="favicon.ico" sizes="any" />
+  <meta name="description" content="Browser-based replayer for MiGTracker Pro .MTP music files using General MIDI SF2 soundfonts via Web Audio API." />
+
+  <!-- IBM Plex Mono via Google Fonts (CSS also imports this, belt-and-suspenders) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- soundfont-player UMD build → exposes window.Soundfont before the ES module boots -->
+  <script src="https://cdn.jsdelivr.net/npm/soundfont-player/dist/soundfont-player.min.js"></script>
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ── Header ── -->
+    <header class="header">
+      <div class="header__left">
+        <span class="header__logo">MiGTRACKER</span>
+        <span class="header__version">Web Player v1.0</span>
+      </div>
+
+      <div class="header__right">
+        <div id="drop-zone" role="button" tabindex="0" aria-label="Drop an MTP file here or click to browse">
+          <span class="drop-icon">⊕ DROP .MTP FILE</span>
+          <small class="drop-sub">or click to browse</small>
+          <input type="file" id="file-input" accept=".mtp,.MTP" hidden />
+        </div>
+      </div>
+    </header>
+
+    <!-- ── Song info ── -->
+    <section class="song-info" aria-label="Song information">
+      <div class="song-info__field">
+        <span class="song-info__key">SONG</span>
+        <span class="song-info__value song-info__value--empty" id="song-name">— no file loaded —</span>
+      </div>
+      <div class="song-info__field">
+        <span class="song-info__key">LASTPOS</span>
+        <span class="song-info__value" id="song-lastpos">—</span>
+      </div>
+      <div class="song-info__field">
+        <span class="song-info__key">LOOPPOS</span>
+        <span class="song-info__value" id="song-looppos">—</span>
+      </div>
+      <div class="song-info__field">
+        <span class="song-info__key">SPEED</span>
+        <span class="song-info__value" id="song-speed">—</span>
+      </div>
+    </section>
+
+    <!-- ── Transport ── -->
+    <section class="transport" aria-label="Transport controls">
+      <div class="transport__buttons">
+        <button id="btn-play"  class="transport__btn transport__btn--play"  title="Play">▶ PLAY</button>
+        <button id="btn-pause" class="transport__btn transport__btn--pause" title="Pause">⏸ PAUSE</button>
+        <button id="btn-stop"  class="transport__btn transport__btn--stop"  title="Stop">■ STOP</button>
+      </div>
+
+      <div class="transport__loop">
+        <input type="checkbox" id="btn-loop" class="transport__loop-checkbox" checked />
+        <span class="transport__loop-indicator"></span>
+        <label for="btn-loop" class="transport__loop-label">↺ LOOP</label>
+      </div>
+
+      <div class="transport__volume">
+        <span class="transport__label">VOL</span>
+        <input type="range" id="vol-slider" min="0" max="100" value="85" class="transport__slider" />
+        <span class="song-info__value" id="vol-display">85%</span>
+      </div>
+    </section>
+
+    <!-- ── Position bar ── -->
+    <div class="position-bar" role="progressbar" aria-label="Song position" aria-valuemin="0" aria-valuemax="100">
+      <div id="pos-fill" class="position-bar__fill"></div>
+    </div>
+
+    <!-- ── Pattern grid ── -->
+    <section aria-label="Pattern visualizer">
+      <div id="pattern-grid" class="pattern-grid" role="grid" aria-label="Pattern data grid">
+        <!-- Built dynamically by PlayerUI.js -->
+      </div>
+    </section>
+
+    <!-- ── Channel panel (mute + VU) ── -->
+    <section aria-label="Channel controls">
+      <div id="channel-panel" class="channel-panel">
+        <!-- Built dynamically by PlayerUI.js -->
+      </div>
+    </section>
+
+    <!-- ── Status bar ── -->
+    <footer class="status-bar" aria-label="Playback status">
+      <div class="status-bar__segment">
+        <span class="status-bar__item" id="status-pos">POS:—/—</span>
+        <span class="status-bar__sep">│</span>
+        <span class="status-bar__item" id="status-step">STEP:—/16</span>
+        <span class="status-bar__sep">│</span>
+        <span class="status-bar__item" id="status-speed">SPD:—</span>
+        <span class="status-bar__sep">│</span>
+        <span class="status-bar__item" id="status-track">PAT:—</span>
+      </div>
+      <div class="status-bar__segment">
+        <span class="status-bar__instrument" id="status-instr">INSTR:—</span>
+        <span class="status-bar__loop" id="status-loop">LOOP:ON</span>
+      </div>
+    </footer>
+
+  </div><!-- /#app -->
+
+  <!-- ── Loading overlay ── -->
+  <div id="loading-overlay" class="loading-overlay" role="status" aria-live="polite">
+    <div class="loading-overlay__spinner"></div>
+    <div id="loading-text" class="loading-overlay__text">Initialising...</div>
+  </div>
+
+  <!-- Player UI entry point (ES module) -->
+  <script type="module" src="js/PlayerUI.js"></script>
+</body>
+</html>
