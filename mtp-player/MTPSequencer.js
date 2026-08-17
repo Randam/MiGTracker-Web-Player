@@ -148,7 +148,7 @@ export class MTPSequencer extends EventTarget {
       const row = pattern[t1 - 1];
       if (!row) continue;
       const v = row[si] ?? 0;
-      if (v > 0  && v < 96)  events.push({ type: 'noteOn', channel: 9, note: v, velocity: Math.min(127, this.volume[16] * 8) });
+      if (v > 0  && v < 96)  events.push({ type: 'noteOn', channel: 9, trackerCh: t1, note: v, velocity: Math.min(127, this.volume[16] * 8) });
       if (v > 95 && v < 112) this.volume[16] = v - 96;
     }
 
@@ -211,7 +211,7 @@ export class MTPSequencer extends EventTarget {
           events.push({ type: 'cc', channel: midiCh, cc: 1, value: 0 });
           const midiNote = Math.max(0, Math.min(127, v + 12 + this.plusvalue));
           const velocity = Math.min(127, this.volume[t1] * 2);
-          events.push({ type: 'noteOn', channel: midiCh, note: midiNote, velocity });
+          events.push({ type: 'noteOn', channel: midiCh, trackerCh: t1, note: midiNote, velocity });
           this.notehis[t1] = midiNote;
         }
       }

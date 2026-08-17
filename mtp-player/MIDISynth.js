@@ -1,10 +1,10 @@
 /**
- * MIDISynth — Web Audio GM synthesizer supporting multiple vintage & modern SoundFont banks
- * plus built-in OPL3 FM synthesis and General MIDI drum engine.
+ * MIDISynth — Web Audio GM synthesizer supporting multiple vintage & modern SoundFont banks,
+ * hardware DSP tone modeling, real-time OPL3 FM synthesis, and General MIDI drum engine.
  *
  * Supported SoundFont Banks:
- *   1. 'fatboy'    — SoundBlaster AWE32 (FatBoy GM 90s Gaming Set)
- *   2. 'awe32rom'  — SoundBlaster AWE32 1MB ROM (1994 EMU8000 Classic)
+ *   1. 'awe32rom'  — SoundBlaster AWE32 1MB ROM (1994 EMU8000 Classic)
+ *   2. 'fatboy'    — SoundBlaster AWE32 (FatBoy GM 90s Gaming Set)
  *   3. 'sc55'      — Roland Sound Canvas SC-55 (90s DOS Benchmark)
  *   4. 'gus'       — Gravis UltraSound (GUS Tracker Patches)
  *   5. 'timgm6mb'  — TimGM6mb (DOSBox / Timidity GM Set)
@@ -14,33 +14,73 @@
  */
 
 export const SOUNDFONT_BANKS = {
-  fatboy: {
-    id: 'FatBoy',
-    name: '💾 SoundBlaster AWE32 (FatBoy GM)',
-    desc: 'Classic 90s DOS Sound Blaster AWE32 / EMU8000 ROM timbre',
-    baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/',
-    isSynth: false,
-  },
   awe32rom: {
     id: 'FatBoy',
     name: '💾 SoundBlaster AWE32 1MB ROM (1994)',
-    desc: 'Original 1MB EMU8000 factory ROM bank (punchy 12-bit DAC)',
+    desc: 'Original 1MB EMU8000 factory ROM bank (11.5kHz vintage filter cutoff, crisp presence, punchy bass)',
     baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/',
     isSynth: false,
+    dsp: {
+      highpass: 45,
+      lowpass: 11500,      // Authentic 1MB ROM filter cutoff
+      presenceFreq: 3400,
+      presenceGain: 3.5,   // EMU8000 presence
+      bassFreq: 110,
+      bassGain: 2.5,       // Tight punchy bass
+      warmthGain: -1.0,
+      bits: 0,
+    }
+  },
+  fatboy: {
+    id: 'FatBoy',
+    name: '💾 SoundBlaster AWE32 (FatBoy GM)',
+    desc: 'Modern full-fidelity Sound Blaster AWE32 / EMU8000 SoundFont 2 (uncompressed, full 22kHz bandwidth)',
+    baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/',
+    isSynth: false,
+    dsp: {
+      highpass: 15,
+      lowpass: 22000,      // Full 20kHz+ bandwidth
+      presenceFreq: 3500,
+      presenceGain: 0.5,
+      bassFreq: 100,
+      bassGain: 0.5,
+      warmthGain: 0.0,
+      bits: 0,
+    }
   },
   sc55: {
-    id: 'FatBoy',
+    id: 'FluidR3_GM',
     name: '🎹 Roland Sound Canvas SC-55 (90s Classic)',
-    desc: 'The reference standard for 90s DOS gaming composers',
-    baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/',
+    desc: 'The reference standard for 90s DOS gaming composers (FluidR3 samples with warm 18-bit analog curve)',
+    baseUrl: 'https://paulrosen.github.io/midi-js-soundfonts/FluidR3_GM/',
     isSynth: false,
+    dsp: {
+      highpass: 30,
+      lowpass: 13500,      // Warm Roland 18-bit DAC rolloff
+      presenceFreq: 2400,
+      presenceGain: 1.5,
+      bassFreq: 140,
+      bassGain: 3.5,       // Signature warm Roland mid-bass
+      warmthGain: 3.0,     // Rich analog body
+      bits: 0,
+    }
   },
   gus: {
     id: 'FatBoy',
     name: '👾 Gravis UltraSound (GUS Tracker)',
-    desc: 'Classic 90s demoscene and FastTracker II GUS sound',
+    desc: 'Classic 90s demoscene and FastTracker II GUS sound (tracker filter curve + high-end sparkle)',
     baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/',
     isSynth: false,
+    dsp: {
+      highpass: 40,
+      lowpass: 14500,      // GUS tracker filtering
+      presenceFreq: 5200,
+      presenceGain: 3.0,   // Demoscene high-end sparkle
+      bassFreq: 120,
+      bassGain: 2.0,
+      warmthGain: 0.0,
+      bits: 0,
+    }
   },
   timgm6mb: {
     id: 'FluidR3_GM',
@@ -48,6 +88,15 @@ export const SOUNDFONT_BANKS = {
     desc: 'Lightweight General MIDI bank used in DOSBox & VLC',
     baseUrl: 'https://paulrosen.github.io/midi-js-soundfonts/FluidR3_GM/',
     isSynth: false,
+    dsp: {
+      highpass: 35,
+      lowpass: 16500,
+      presenceFreq: 3000,
+      presenceGain: 0.8,
+      bassFreq: 120,
+      bassGain: 0.8,
+      warmthGain: 0.0,
+    }
   },
   fluidr3: {
     id: 'FluidR3_GM',
@@ -55,6 +104,15 @@ export const SOUNDFONT_BANKS = {
     desc: 'Rich 90s/2000s General MIDI SoundFont 2 (Clean & Warm)',
     baseUrl: 'https://paulrosen.github.io/midi-js-soundfonts/FluidR3_GM/',
     isSynth: false,
+    dsp: {
+      highpass: 10,
+      lowpass: 22000,
+      presenceFreq: 4000,
+      presenceGain: 0.0,
+      bassFreq: 80,
+      bassGain: 0.0,
+      warmthGain: 0.0,
+    }
   },
   musyngkite: {
     id: 'MusyngKite',
@@ -62,6 +120,15 @@ export const SOUNDFONT_BANKS = {
     desc: 'High dynamic range orchestral & studio acoustic bank',
     baseUrl: 'https://paulrosen.github.io/midi-js-soundfonts/MusyngKite/',
     isSynth: false,
+    dsp: {
+      highpass: 10,
+      lowpass: 24000,
+      presenceFreq: 6500,
+      presenceGain: 2.2,   // Crystal studio air
+      bassFreq: 60,
+      bassGain: 1.5,
+      warmthGain: 0.5,
+    }
   },
   opl3: {
     id: 'OPL3_FM',
@@ -69,6 +136,31 @@ export const SOUNDFONT_BANKS = {
     desc: 'Pure real-time 2-operator FM synthesis (0 KB download, 100% offline)',
     baseUrl: '',
     isSynth: true,
+    dsp: {
+      highpass: 50,
+      lowpass: 12000,      // Classic Sound Blaster 16 OPL3 output filter
+      presenceFreq: 3200,
+      presenceGain: 2.0,
+      bassFreq: 120,
+      bassGain: 1.0,
+      warmthGain: 0.0,
+    }
+  },
+  tabla: {
+    id: 'Tabla',
+    name: '🪘 Indian Tabla & Ethnic Percussion',
+    desc: 'Authentic Indian Tabla (Bayan bass pitch modulation + Dayan treble bell resonances)',
+    baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/',
+    isTabla: true,
+    dsp: {
+      highpass: 25,
+      lowpass: 18000,
+      presenceFreq: 3800,
+      presenceGain: 2.5,
+      bassFreq: 105,
+      bassGain: 3.5,
+      warmthGain: 2.0,
+    }
   },
 };
 
@@ -77,7 +169,7 @@ export const SOUNDFONT_BANKS = {
  * Index 0-127 = GM program (0-based).
  */
 const GM_NAMES = [
-  'acoustic_grand_piano','bright_acoustic_piano','electric_grand_piano','honky-tonk_piano',
+  'acoustic_grand_piano','bright_acoustic_piano','electric_grand_piano','honkytonk_piano',
   'electric_piano_1','electric_piano_2','harpsichord','clavinet',
   'celesta','glockenspiel','music_box','vibraphone','marimba','xylophone',
   'tubular_bells','dulcimer','drawbar_organ','percussive_organ','rock_organ',
@@ -90,19 +182,19 @@ const GM_NAMES = [
   'violin','viola','cello','contrabass','tremolo_strings','pizzicato_strings',
   'orchestral_harp','timpani',
   'string_ensemble_1','string_ensemble_2','synth_strings_1','synth_strings_2',
-  'choir_aahs','voice_oohs','synth_voice','orchestra_hit',
+  'choir_aahs','voice_oohs','synth_choir','orchestra_hit',
   'trumpet','trombone','tuba','muted_trumpet','french_horn','brass_section',
   'synth_brass_1','synth_brass_2',
   'soprano_sax','alto_sax','tenor_sax','baritone_sax',
   'oboe','english_horn','bassoon','clarinet',
   'piccolo','flute','recorder','pan_flute','blown_bottle','shakuhachi','whistle','ocarina',
   'lead_1_square','lead_2_sawtooth','lead_3_calliope','lead_4_chiff',
-  'lead_5_charang','lead_6_voice','lead_7_fifths','lead_8_bass_lead',
+  'lead_5_charang','lead_6_voice','lead_7_fifths','lead_8_bass__lead',
   'pad_1_new_age','pad_2_warm','pad_3_polysynth','pad_4_choir',
   'pad_5_bowed','pad_6_metallic','pad_7_halo','pad_8_sweep',
   'fx_1_rain','fx_2_soundtrack','fx_3_crystal','fx_4_atmosphere',
-  'fx_5_brightness','fx_6_goblins','fx_7_echoes','fx_8_sci-fi',
-  'sitar','banjo','shamisen','koto','kalimba','bag_pipe','fiddle','shanai',
+  'fx_5_brightness','fx_6_goblins','fx_7_echoes','fx_8_scifi',
+  'sitar','banjo','shamisen','koto','kalimba','bagpipe','fiddle','shanai',
   'tinkle_bell','agogo','steel_drums','woodblock','taiko_drum','melodic_tom',
   'synth_drum','reverse_cymbal',
   'guitar_fret_noise','breath_noise','seashore','bird_tweet','telephone_ring',
@@ -158,11 +250,17 @@ class OPL3Synth {
     mod.start(when);
     car.start(when);
 
-    const stopTime = when + decayTime + 0.1;
-    if (params.carDecay > 0) {
-      mod.stop(stopTime);
-      car.stop(stopTime);
-    }
+    const cleanup = () => {
+      try {
+        car.disconnect();
+        carGain.disconnect();
+        mod.disconnect();
+        modGain.disconnect();
+      } catch { /* already disconnected */ }
+    };
+
+    car.onended = cleanup;
+    setTimeout(cleanup, (decayTime + 0.3) * 1000);
 
     return {
       stop: (stopWhen) => {
@@ -170,9 +268,10 @@ class OPL3Synth {
           const t = Math.max(this.ctx.currentTime, stopWhen);
           carGain.gain.cancelScheduledValues(t);
           carGain.gain.setValueAtTime(carGain.gain.value, t);
-          carGain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
-          mod.stop(t + 0.07);
-          car.stop(t + 0.07);
+          carGain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+          mod.stop(t + 0.05);
+          car.stop(t + 0.05);
+          setTimeout(cleanup, Math.max(20, (t - this.ctx.currentTime + 0.08) * 1000));
         } catch { /* already stopped */ }
       }
     };
@@ -289,6 +388,14 @@ class GMDrumSynth {
     }
   }
 
+  _cleanup(nodes, durationMs) {
+    setTimeout(() => {
+      for (const n of nodes) {
+        try { n?.disconnect?.(); } catch { /* ignore */ }
+      }
+    }, durationMs);
+  }
+
   _playKick(when, gain, dest, startFreq = 155) {
     const osc = this.ctx.createOscillator();
     const g = this.ctx.createGain();
@@ -317,6 +424,8 @@ class GMDrumSynth {
     g.connect(dest);
     osc.start(when);
     osc.stop(when + 0.36);
+
+    this._cleanup([clickOsc, clickGain, osc, g], 450);
   }
 
   _playSnare(when, gain, dest, isElectric = false) {
@@ -331,6 +440,8 @@ class GMDrumSynth {
     oscGain.connect(dest);
     osc.start(when);
     osc.stop(when + 0.16);
+
+    const cleanupNodes = [osc, oscGain];
 
     if (this._noiseBuffer) {
       const noise = this.ctx.createBufferSource();
@@ -348,7 +459,10 @@ class GMDrumSynth {
       noiseGain.connect(dest);
       noise.start(when);
       noise.stop(when + 0.23);
+      cleanupNodes.push(noise, filter, noiseGain);
     }
+
+    this._cleanup(cleanupNodes, 350);
   }
 
   _playHiHat(when, gain, dest, isOpen) {
@@ -372,6 +486,8 @@ class GMDrumSynth {
     g.connect(dest);
     noise.start(when);
     noise.stop(when + dur + 0.01);
+
+    this._cleanup([noise, filter, g], (dur + 0.05) * 1000);
   }
 
   _playCrash(when, gain, dest) {
@@ -394,6 +510,8 @@ class GMDrumSynth {
     g.connect(dest);
     noise.start(when);
     noise.stop(when + dur + 0.01);
+
+    this._cleanup([noise, filter, g], 1400);
   }
 
   _playRide(when, gain, dest) {
@@ -407,6 +525,8 @@ class GMDrumSynth {
     oscGain.connect(dest);
     osc1.start(when);
     osc1.stop(when + 0.61);
+
+    const cleanupNodes = [osc1, oscGain];
 
     if (this._noiseBuffer) {
       const noise = this.ctx.createBufferSource();
@@ -423,7 +543,10 @@ class GMDrumSynth {
       g.connect(dest);
       noise.start(when);
       noise.stop(when + 0.51);
+      cleanupNodes.push(noise, filter, g);
     }
+
+    this._cleanup(cleanupNodes, 800);
   }
 
   _playTom(when, gain, dest, note) {
@@ -443,6 +566,8 @@ class GMDrumSynth {
     g.connect(dest);
     osc.start(when);
     osc.stop(when + 0.29);
+
+    this._cleanup([osc, g], 400);
   }
 
   _playRimshot(when, gain, dest) {
@@ -456,10 +581,13 @@ class GMDrumSynth {
     g.connect(dest);
     osc.start(when);
     osc.stop(when + 0.045);
+
+    this._cleanup([osc, g], 100);
   }
 
   _playClap(when, gain, dest) {
     if (!this._noiseBuffer) return;
+    const cleanupNodes = [];
     [0, 0.012, 0.024].forEach((offset, idx) => {
       const isLast = (idx === 2);
       const dur = isLast ? 0.15 : 0.015;
@@ -477,10 +605,14 @@ class GMDrumSynth {
       g.connect(dest);
       noise.start(when + offset);
       noise.stop(when + offset + dur + 0.01);
+      cleanupNodes.push(noise, filter, g);
     });
+
+    this._cleanup(cleanupNodes, 350);
   }
 
   _playCowbell(when, gain, dest) {
+    const cleanupNodes = [];
     [587, 845].forEach(freq => {
       const osc = this.ctx.createOscillator();
       const g = this.ctx.createGain();
@@ -497,7 +629,10 @@ class GMDrumSynth {
       g.connect(dest);
       osc.start(when);
       osc.stop(when + 0.21);
+      cleanupNodes.push(osc, filter, g);
     });
+
+    this._cleanup(cleanupNodes, 300);
   }
 
   _playShaker(when, gain, dest) {
@@ -515,6 +650,8 @@ class GMDrumSynth {
     g.connect(dest);
     noise.start(when);
     noise.stop(when + 0.07);
+
+    this._cleanup([noise, filter, g], 150);
   }
 
   _playWoodblock(when, gain, dest, note) {
@@ -528,6 +665,8 @@ class GMDrumSynth {
     g.connect(dest);
     osc.start(when);
     osc.stop(when + 0.055);
+
+    this._cleanup([osc, g], 120);
   }
 
   _playGenericPercussion(when, gain, dest, note) {
@@ -543,17 +682,168 @@ class GMDrumSynth {
     g.connect(dest);
     osc.start(when);
     osc.stop(when + 0.16);
+
+    this._cleanup([osc, g], 250);
   }
+
+  // ── Indian Tabla Synthesis ───────────────────────────────────────────────────
+
+  playTabla(note, time, velocityGain, destination) {
+    const when = Math.max(this.ctx.currentTime, time);
+    const gain = Math.max(0, Math.min(1.5, velocityGain));
+
+    switch (note) {
+      case 35: // Bayan (Dha - heavy open bass)
+      case 36: // Bayan (Ge - pitch bending bass)
+        this._playTablaBayan(when, gain, destination, note === 36);
+        break;
+
+      case 38: // Dayan (Tin - open ringing treble stroke)
+      case 40: // Dayan (Tun - resonant bell tone)
+        this._playTablaDayan(when, gain, destination, note === 40 ? 330 : 294);
+        break;
+
+      case 42: // Dayan (Na - rim stroke)
+      case 44: // Dayan (Ta - edge stroke)
+        this._playTablaRim(when, gain, destination, 1175);
+        break;
+
+      case 46: // Dayan (Open sustained Tun)
+        this._playTablaDayan(when, gain * 1.1, destination, 294, 0.55);
+        break;
+
+      case 37: // Kat (flat muted hand stroke on Dayan)
+      case 39: // Ke (muted flat stroke on Bayan)
+        this._playTablaMute(when, gain, destination);
+        break;
+
+      case 41:
+      case 43:
+      case 45: // Low Bayan tones
+        this._playTablaBayan(when, gain * 0.9, destination, false, 95);
+        break;
+
+      default:
+        this._playTablaDayan(when, gain * 0.8, destination, 220 + ((note % 12) * 20));
+        break;
+    }
+  }
+
+  _playTablaBayan(when, gain, dest, isBending = true, baseFreq = 72) {
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+
+    osc.type = 'sine';
+    if (isBending) {
+      osc.frequency.setValueAtTime(baseFreq, when);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.45, when + 0.09);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.1, when + 0.3);
+    } else {
+      osc.frequency.setValueAtTime(baseFreq * 1.3, when);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq, when + 0.15);
+    }
+
+    g.gain.setValueAtTime(gain * 1.3, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.45);
+
+    const osc2 = this.ctx.createOscillator();
+    const g2 = this.ctx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(baseFreq * 2, when);
+    g2.gain.setValueAtTime(gain * 0.3, when);
+    g2.gain.exponentialRampToValueAtTime(0.001, when + 0.2);
+
+    osc.connect(g);
+    osc2.connect(g2);
+    g.connect(dest);
+    g2.connect(dest);
+
+    osc.start(when);
+    osc2.start(when);
+    osc.stop(when + 0.46);
+    osc2.stop(when + 0.21);
+
+    this._cleanup([osc, g, osc2, g2], 550);
+  }
+
+  _playTablaDayan(when, gain, dest, freq = 294, dur = 0.4) {
+    const cleanupNodes = [];
+    [freq, freq * 2, freq * 3.02].forEach((f, idx) => {
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = idx === 0 ? 'sine' : 'triangle';
+      osc.frequency.setValueAtTime(f, when);
+
+      const amp = gain * (idx === 0 ? 0.9 : (idx === 1 ? 0.45 : 0.2));
+      g.gain.setValueAtTime(amp, when);
+      g.gain.exponentialRampToValueAtTime(0.001, when + dur * (idx === 0 ? 1.0 : 0.5));
+
+      osc.connect(g);
+      g.connect(dest);
+      osc.start(when);
+      osc.stop(when + dur + 0.02);
+      cleanupNodes.push(osc, g);
+    });
+
+    this._cleanup(cleanupNodes, (dur + 0.1) * 1000);
+  }
+
+  _playTablaRim(when, gain, dest, freq = 1175) {
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, when);
+
+    g.gain.setValueAtTime(gain * 0.8, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
+
+    osc.connect(g);
+    g.connect(dest);
+    osc.start(when);
+    osc.stop(when + 0.13);
+
+    this._cleanup([osc, g], 180);
+  }
+
+  _playTablaMute(when, gain, dest) {
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(360, when);
+    osc.frequency.exponentialRampToValueAtTime(90, when + 0.04);
+
+    g.gain.setValueAtTime(gain * 0.9, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.045);
+
+    osc.connect(g);
+    g.connect(dest);
+    osc.start(when);
+    osc.stop(when + 0.05);
+
+    this._cleanup([osc, g], 100);
+  }
+}
+
+function createQuantizeCurve(bits) {
+  if (!bits || bits >= 16) return null;
+  const steps = Math.pow(2, bits);
+  const n = 4096;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    curve[i] = Math.round(x * (steps / 2)) / (steps / 2);
+  }
+  return curve;
 }
 
 export class MIDISynth {
 
   constructor({
-    soundfontBank = 'fatboy',      // default: SoundBlaster AWE32 / 90s vintage
+    soundfontBank = 'awe32rom',   // default: SoundBlaster AWE32 1MB ROM
     soundfontFormat = 'mp3',
     percussionMode = 'soundfont',  // 'soundfont' (SF2 samples) or 'synth'
   } = {}) {
-    this._soundfontBank   = SOUNDFONT_BANKS[soundfontBank] ? soundfontBank : 'fatboy';
+    this._soundfontBank   = SOUNDFONT_BANKS[soundfontBank] ? soundfontBank : 'awe32rom';
     this._soundfontFormat = soundfontFormat;
     this._percussionMode  = percussionMode;
     this._SF              = null;  // soundfont-player library reference
@@ -564,6 +854,14 @@ export class MIDISynth {
     this._loading         = new Map();  // in-flight load promises (dedup)
     this._drumSynth       = null;       // built-in GM drum synthesizer
     this._opl3Synth       = null;       // real-time OPL3 FM synthesizer
+
+    // Hardware DSP filter & DAC nodes
+    this._dspHighpass     = null;
+    this._dspLowpass      = null;
+    this._dspPresence     = null;
+    this._dspBass         = null;
+    this._dspBitcrusher   = null;
+    this._dspWarmth       = null;
   }
 
   // ── Initialisation ──────────────────────────────────────────────────────────
@@ -575,19 +873,49 @@ export class MIDISynth {
   async init(audioCtx) {
     this._ctx = audioCtx || new AudioContext();
 
+    // Master Gain
     this._masterGain = this._ctx.createGain();
     this._masterGain.gain.value = 0.85;
     this._masterGain.connect(this._ctx.destination);
+
+    // Build Hardware DSP Filter Chain
+    this._dspHighpass = this._ctx.createBiquadFilter();
+    this._dspHighpass.type = 'highpass';
+
+    this._dspLowpass = this._ctx.createBiquadFilter();
+    this._dspLowpass.type = 'lowpass';
+
+    this._dspPresence = this._ctx.createBiquadFilter();
+    this._dspPresence.type = 'peaking';
+
+    this._dspBass = this._ctx.createBiquadFilter();
+    this._dspBass.type = 'lowshelf';
+
+    this._dspBitcrusher = this._ctx.createWaveShaper();
+    this._dspBitcrusher.oversample = 'none';
+
+    this._dspWarmth = this._ctx.createBiquadFilter();
+    this._dspWarmth.type = 'peaking';
+
+    // Connect DSP Chain: HP -> LP -> Presence -> Bass -> Bitcrusher -> Warmth -> MasterGain
+    this._dspHighpass.connect(this._dspLowpass);
+    this._dspLowpass.connect(this._dspPresence);
+    this._dspPresence.connect(this._dspBass);
+    this._dspBass.connect(this._dspBitcrusher);
+    this._dspBitcrusher.connect(this._dspWarmth);
+    this._dspWarmth.connect(this._masterGain);
+
+    this._applyBankDSP(this._soundfontBank);
 
     this._drumSynth = new GMDrumSynth(this._ctx);
     this._opl3Synth = new OPL3Synth(this._ctx);
     this._SF = await this._resolveSoundfontLib();
 
-    // 16 MIDI channels: each has its own gain node + state
+    // 16 MIDI channels: each has its own gain node connected into the DSP Chain
     for (let i = 0; i < 16; i++) {
       const channelGain = this._ctx.createGain();
       channelGain.gain.value = 1.0;
-      channelGain.connect(this._masterGain);
+      channelGain.connect(this._dspHighpass);
 
       this._channels[i] = {
         program:     i === 9 ? 128 : 0, // ch 9 fixed = GM percussion (program 128)
@@ -597,6 +925,10 @@ export class MIDISynth {
         gain:        channelGain,
       };
     }
+
+    const currentBank = SOUNDFONT_BANKS[this._soundfontBank];
+    console.log(`%c[MIDISynth] 🎵 Initialized synthesizer with default bank: %c${currentBank.name}`, 'color:#39ff14;font-weight:bold', 'color:#ffb700;font-weight:bold');
+    console.log(`[MIDISynth]  ℹ Bank Description: ${currentBank.desc}`);
 
     if (this._percussionMode === 'soundfont' && !this.isCurrentBankSynth) {
       this._preload(128).catch(() => {});
@@ -619,18 +951,55 @@ export class MIDISynth {
     );
   }
 
-  // ── SoundFont Bank Selection ────────────────────────────────────────────────
+  // ── SoundFont Bank & DSP Selection ──────────────────────────────────────────
+
+  _applyBankDSP(bankKey) {
+    if (!this._ctx || !this._dspHighpass) return;
+    const profile = SOUNDFONT_BANKS[bankKey]?.dsp;
+    if (!profile) return;
+    const now = this._ctx.currentTime;
+
+    this._dspHighpass.frequency.setTargetAtTime(profile.highpass, now, 0.03);
+    this._dspLowpass.frequency.setTargetAtTime(profile.lowpass, now, 0.03);
+    this._dspPresence.frequency.setTargetAtTime(profile.presenceFreq, now, 0.03);
+    this._dspPresence.gain.setTargetAtTime(profile.presenceGain, now, 0.03);
+    this._dspPresence.Q.setTargetAtTime(1.2, now, 0.03);
+    this._dspBass.frequency.setTargetAtTime(profile.bassFreq, now, 0.03);
+    this._dspBass.gain.setTargetAtTime(profile.bassGain, now, 0.03);
+    this._dspWarmth.frequency.setTargetAtTime(450, now, 0.03);
+    this._dspWarmth.gain.setTargetAtTime(profile.warmthGain, now, 0.03);
+    this._dspWarmth.Q.setTargetAtTime(0.8, now, 0.03);
+
+    // Apply DAC bitcrushing / quantization if configured
+    if (this._dspBitcrusher) {
+      if (profile.bits && profile.bits > 0 && profile.bits < 16) {
+        this._dspBitcrusher.curve = createQuantizeCurve(profile.bits);
+      } else {
+        this._dspBitcrusher.curve = null;
+      }
+    }
+  }
 
   /**
-   * Switch the active SoundFont bank (e.g. 'fatboy', 'awe32rom', 'sc55', 'gus', 'timgm6mb', 'fluidr3', 'musyngkite', 'opl3').
+   * Switch the active SoundFont bank.
    * @param {string} bankKey
    */
   setSoundfontBank(bankKey) {
-    if (!SOUNDFONT_BANKS[bankKey]) return;
+    if (!SOUNDFONT_BANKS[bankKey]) {
+      console.warn(`[MIDISynth] Unknown bank key: "${bankKey}"`);
+      return;
+    }
     this._soundfontBank = bankKey;
-    // Clear instrument cache so new bank samples load for melodic programs
+    const bank = SOUNDFONT_BANKS[bankKey];
+
+    console.log(`%c[MIDISynth] 🔄 Switched SoundFont Bank to: %c${bank.name}`, 'color:#39ff14;font-weight:bold', 'color:#ffb700;font-weight:bold');
+    console.log(`[MIDISynth]  ℹ Description: ${bank.desc}`);
+    console.log(`[MIDISynth]  ℹ Sound Engine: ${bank.isSynth ? 'Real-time Web Audio OPL3 FM Synthesizer' : bank.baseUrl}`);
+
+    this._applyBankDSP(bankKey);
     this._players.clear();
     this._loading.clear();
+
     if (this._percussionMode === 'soundfont' && !this.isCurrentBankSynth) {
       this._preload(128).catch(() => {});
     }
@@ -638,6 +1007,10 @@ export class MIDISynth {
 
   get soundfontBank() {
     return this._soundfontBank;
+  }
+
+  get currentBankInfo() {
+    return SOUNDFONT_BANKS[this._soundfontBank] || SOUNDFONT_BANKS.awe32rom;
   }
 
   get isCurrentBankSynth() {
@@ -663,28 +1036,27 @@ export class MIDISynth {
     if (this._loading.has(program)) return this._loading.get(program);
     if (this._players.has(program)) return Promise.resolve(this._players.get(program));
 
-    // Program 128 = percussion soundfont
     const isPercussion = (program === 128);
     const name = isPercussion ? 'percussion' : (GM_NAMES[program] ?? GM_NAMES[0]);
-    const bank = SOUNDFONT_BANKS[this._soundfontBank] || SOUNDFONT_BANKS.fatboy;
+    const bank = SOUNDFONT_BANKS[this._soundfontBank] || SOUNDFONT_BANKS.awe32rom;
+    const url = isPercussion
+      ? `https://paulrosen.github.io/midi-js-soundfonts/FluidR3_GM/percussion-${this._soundfontFormat}.js`
+      : `${bank.baseUrl}${name}-${this._soundfontFormat}.js`;
+
+    console.log(`[MIDISynth] ⏳ Loading instrument [Prog ${program}: "${name}"] from ${url}...`);
 
     const promise = this._SF.instrument(this._ctx, name, {
       soundfont: bank.id,
       format:    this._soundfontFormat,
-      nameToUrl: (n, sf, fmt) => {
-        if (n === 'percussion') {
-          // Verified FluidR3_GM percussion SF2 soundfont
-          return `https://paulrosen.github.io/midi-js-soundfonts/FluidR3_GM/percussion-${fmt}.js`;
-        }
-        return `${bank.baseUrl}${n}-${fmt}.js`;
-      },
+      nameToUrl: () => url,
     }).then(player => {
       this._players.set(program, player);
       this._loading.delete(program);
+      console.log(`%c[MIDISynth]  ✓ Loaded instrument [Prog ${program}: "${name}"] successfully for "${bank.name}"`, 'color:#39ff14');
       return player;
     }).catch(err => {
       this._loading.delete(program);
-      console.warn(`MIDISynth: could not load soundfont instrument ${program} ("${name}"):`, err.message);
+      console.error(`[MIDISynth]  ✗ Could not load soundfont instrument [Prog ${program}: "${name}"] from ${url}:`, err.message);
       return null;
     });
 
@@ -700,6 +1072,7 @@ export class MIDISynth {
    */
   setPercussionMode(mode) {
     this._percussionMode = mode === 'synth' ? 'synth' : 'soundfont';
+    console.log(`%c[MIDISynth] 🥁 Percussion Mode set to: %c${this._percussionMode.toUpperCase()}`, 'color:#39ff14;font-weight:bold', 'color:#ffb700;font-weight:bold');
     if (this._percussionMode === 'soundfont' && !this.isCurrentBankSynth) {
       this._preload(128).catch(() => {});
     }
@@ -727,11 +1100,25 @@ export class MIDISynth {
 
     // ── Channel 9 = General MIDI Percussion ──────────────────────────────────
     if (channel === 9) {
+      if (this._soundfontBank === 'tabla') {
+        if (this._drumSynth) {
+          this._drumSynth.playTabla(note, when, gain, ch.gain);
+        }
+        return;
+      }
       if (this._percussionMode === 'soundfont' && !this.isCurrentBankSynth) {
-        const drumPlayer = await this._getPlayer(128);
+        const drumPlayer = this._players.get(128);
         if (drumPlayer) {
-          const node = drumPlayer.play(note, when, { gain, destination: ch.gain });
-          if (node) ch.activeNotes.set(note, node);
+          const node = drumPlayer.play(note, when, { gain, duration: 1.5, destination: ch.gain });
+          if (node?.source) {
+            node.source.onended = () => {
+              try {
+                node.disconnect();
+                node.source.disconnect();
+                node.env?.disconnect?.();
+              } catch { /* already disconnected */ }
+            };
+          }
           return;
         }
       }
@@ -742,28 +1129,45 @@ export class MIDISynth {
       return;
     }
 
+    // ── Melodic tracker channels: strictly 1 active voice per tracker channel ──
+    // Immediately stop and cut off the previous note at timestamp 'when'
+    this._stopNote(ch, undefined, when);
+
     // ── OPL3 FM Synthesizer Mode ─────────────────────────────────────────────
     if (this.isCurrentBankSynth && this._opl3Synth) {
-      this._stopNote(ch, note, when);
       const node = this._opl3Synth.playNote(ch.program, note, when, gain, ch.gain);
       if (node) ch.activeNotes.set(note, node);
       return;
     }
 
     // ── Melodic instrument channels (0..8, 10..15) — SoundFont ───────────────
-    const player = await this._getPlayer(ch.program);
+    let player = this._players.get(ch.program);
+    if (!player) {
+      this._preload(ch.program).catch(() => {});
+      player = this._players.get(0); // fallback to piano if loading
+    }
     if (!player) return;
 
-    this._stopNote(ch, note, when);
-
+    // Play note naturally without hard duration cap
     const node = player.play(note, when, { gain, destination: ch.gain });
-    if (node) ch.activeNotes.set(note, node);
+    if (node) {
+      if (node.source) {
+        node.source.onended = () => {
+          try {
+            node.disconnect();
+            node.source.disconnect();
+            node.env?.disconnect?.();
+          } catch { /* already disconnected */ }
+        };
+      }
+      ch.activeNotes.set(note, node);
+    }
   }
 
   /**
    * Schedule a note-off event.
    * @param {number} channel
-   * @param {number} note
+   * @param {number} [note]
    * @param {number} [time]
    */
   noteOff(channel, note, time = 0) {
@@ -774,14 +1178,33 @@ export class MIDISynth {
   }
 
   _stopNote(ch, note, when) {
-    const node = ch.activeNotes.get(note);
-    if (!node) return;
-    try { node.stop(when + 0.02); } catch { /* already stopped */ }
-    ch.activeNotes.delete(note);
+    const stopAt = Math.max(this._ctx.currentTime, when);
+
+    const cleanupNode = (node) => {
+      if (!node) return;
+      try { node.stop?.(stopAt); } catch { /* ignore */ }
+      setTimeout(() => {
+        try {
+          node.disconnect?.();
+          node.source?.disconnect?.();
+          node.env?.disconnect?.();
+        } catch { /* ignore */ }
+      }, Math.max(50, (stopAt - this._ctx.currentTime) * 1000 + 100));
+    };
+
+    if (note !== undefined && ch.activeNotes.has(note)) {
+      cleanupNode(ch.activeNotes.get(note));
+      ch.activeNotes.delete(note);
+    } else {
+      for (const [n, node] of ch.activeNotes) {
+        cleanupNode(node);
+      }
+      ch.activeNotes.clear();
+    }
   }
 
   /** Send MIDI CC (Control Change). */
-  controlChange(channel, cc, value) {
+  controlChange(channel, cc, value, time = 0) {
     const ch = this._channels[channel];
     if (!ch) return;
 
@@ -789,7 +1212,7 @@ export class MIDISynth {
       case 7: // Channel Volume (0–127)
         ch.volume = value / 127;
         if (ch.gain) {
-          ch.gain.gain.setTargetAtTime(ch.volume, this._ctx.currentTime, 0.01);
+          ch.gain.gain.setTargetAtTime(ch.volume, time || this._ctx.currentTime, 0.01);
         }
         break;
 
@@ -799,7 +1222,7 @@ export class MIDISynth {
 
       case 120: // All Sound Off
       case 123: // All Notes Off
-        this.silenceChannel(channel);
+        this.silenceChannel(channel, time);
         break;
     }
   }
@@ -816,16 +1239,69 @@ export class MIDISynth {
   }
 
   /** Stop all active notes on a channel immediately. */
-  silenceChannel(channel) {
+  silenceChannel(channel, time = 0) {
     const ch = this._channels[channel];
     if (!ch || !this._ctx) return;
-    const now = this._ctx.currentTime;
-    for (const [note] of ch.activeNotes) this._stopNote(ch, note, now);
+    const stopTime = time || this._ctx.currentTime;
+    this._stopNote(ch, undefined, stopTime);
   }
 
-  /** Stop all notes on all channels. */
-  silenceAll() {
-    for (let i = 0; i < 16; i++) this.silenceChannel(i);
+  /**
+   * Stop all notes on all channels immediately with a clean, click-free fast fade-out (20ms).
+   * Kills any future pre-buffered notes so nothing continues to play.
+   * @param {number} [fastFadeMs=20]
+   */
+  silenceAll(fastFadeMs = 20) {
+    if (!this._ctx) return;
+    const now = this._ctx.currentTime;
+    const fadeSec = Math.max(0.005, fastFadeMs / 1000);
+    const stopTime = now + fadeSec;
+
+    // 1. Tell soundfont-player to immediately cancel and stop ALL tracked/buffered notes across all instruments
+    for (const player of this._players.values()) {
+      try { player.stop?.(stopTime); } catch { /* ignore */ }
+    }
+
+    // 2. Fast fade-out on every channel gain and stop active node handles
+    for (let i = 0; i < 16; i++) {
+      const ch = this._channels[i];
+      if (ch) {
+        if (ch.gain) {
+          ch.gain.gain.cancelScheduledValues(now);
+          ch.gain.gain.setValueAtTime(ch.gain.gain.value, now);
+          ch.gain.gain.exponentialRampToValueAtTime(0.0001, stopTime);
+        }
+        for (const [note, node] of ch.activeNotes) {
+          try { node.stop?.(stopTime); } catch { /* ignore */ }
+          try { node.source?.stop?.(stopTime); } catch { /* ignore */ }
+        }
+        ch.activeNotes.clear();
+      }
+    }
+
+    // 3. Fast fade-out on master gain
+    if (this._masterGain) {
+      this._masterGain.gain.cancelScheduledValues(now);
+      this._masterGain.gain.setValueAtTime(this._masterGain.gain.value, now);
+      this._masterGain.gain.exponentialRampToValueAtTime(0.0001, stopTime);
+    }
+  }
+
+  /** Restore master volume and channel gains when starting new playback. */
+  resumeGains() {
+    if (!this._ctx) return;
+    const now = this._ctx.currentTime;
+    for (let i = 0; i < 16; i++) {
+      const ch = this._channels[i];
+      if (ch?.gain) {
+        ch.gain.gain.cancelScheduledValues(now);
+        ch.gain.gain.setValueAtTime(ch.volume, now);
+      }
+    }
+    if (this._masterGain) {
+      this._masterGain.gain.cancelScheduledValues(now);
+      this._masterGain.gain.setValueAtTime(0.85, now);
+    }
   }
 
   // ── Volume / state ──────────────────────────────────────────────────────────
@@ -843,11 +1319,27 @@ export class MIDISynth {
    * Pre-warm a set of GM programs so the first note plays without CDN latency.
    * @param {number[]} programs  Array of GM program numbers (0-based)
    */
-  preloadPrograms(programs) {
-    if (this.isCurrentBankSynth) return;
-    for (const p of programs) this._preload(p).catch(() => {});
+  async preloadPrograms(programs) {
+    const bank = SOUNDFONT_BANKS[this._soundfontBank];
+    if (this.isCurrentBankSynth) {
+      console.log(`%c[MIDISynth]  ✓ Active bank is real-time FM engine ("${bank.name}"). Zero download needed.`, 'color:#39ff14');
+      return;
+    }
+
+    const toLoad = [...new Set(programs)];
     if (this._percussionMode === 'soundfont') {
-      this._preload(128).catch(() => {});
+      toLoad.push(128);
+    }
+
+    console.log(`%c[MIDISynth] ⏳ Preloading ${toLoad.length} instrument(s) for bank "${bank.name}"...`, 'color:#ffb700');
+    const results = await Promise.allSettled(toLoad.map(p => this._preload(p)));
+    const succeeded = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
+    const failed = results.length - succeeded;
+
+    if (failed === 0) {
+      console.log(`%c[MIDISynth]  ✓ Successfully loaded bank "${bank.name}" (${succeeded}/${toLoad.length} instruments ready).`, 'color:#39ff14;font-weight:bold');
+    } else {
+      console.warn(`[MIDISynth]  ⚠ Bank "${bank.name}" loaded with ${succeeded} ready, ${failed} failed.`);
     }
   }
 

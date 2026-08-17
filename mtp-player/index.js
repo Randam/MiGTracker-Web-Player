@@ -98,6 +98,69 @@ export class MTPPlayer extends EventTarget {
     this._setSong(song);
   }
 
+  _extractSongPrograms(song) {
+    if (!song) return [];
+    const programs = new Set();
+
+    // 1. Initial channel start voices (melodic tracks 1..15)
+    if (song.channelDefs) {
+      for (let ch = 0; ch < 15; ch++) {
+        const d = song.channelDefs[ch];
+        if (d && d.startvoice > 0) {
+          programs.add(Math.max(0, Math.min(127, d.startvoice - 1)));
+        }
+      }
+    }
+
+    // 2. All entries in the voicechange lookup table (20 entries)
+    if (song.voicechange) {
+      for (const v of song.voicechange) {
+        if (v > 0) {
+          programs.add(Math.max(0, Math.min(127, v - 1)));
+        }
+      }
+    }
+
+    // 3. Scan all pattern cells for voice changes and percussion
+    let hasPercussion = false;
+    if (song.patterns) {
+      for (const pattern of song.patterns) {
+        if (!pattern) continue;
+        // Check music tracks 1..15 for instrument changes (225..245)
+        for (let ch = 0; ch < 15; ch++) {
+          const row = pattern[ch];
+          if (!row) continue;
+          for (let step = 0; step < 16; step++) {
+            const v = row[step];
+            if (v > 224 && v < 246 && song.voicechange) {
+              const vcIdx = v - 225;
+              const newVoice = song.voicechange[vcIdx];
+              if (newVoice > 0) {
+                programs.add(Math.max(0, Math.min(127, newVoice - 1)));
+              }
+            }
+          }
+        }
+        // Check drum tracks 16 & 17 (index 15 & 16)
+        for (let ch = 15; ch <= 16; ch++) {
+          const row = pattern[ch];
+          if (!row) continue;
+          for (let step = 0; step < 16; step++) {
+            const v = row[step];
+            if (v > 0 && v < 96) hasPercussion = true;
+          }
+        }
+      }
+    }
+
+    // 4. If percussion is used, preload program 128 (drum kit)
+    if (hasPercussion && this._synth.percussionMode === 'soundfont' && !this._synth.isCurrentBankSynth) {
+      programs.add(128);
+    }
+
+    return [...programs];
+  }
+
   _setSong(song) {
     const wasPlaying = this._playing;
     if (wasPlaying) this._stopScheduler();
@@ -105,15 +168,10 @@ export class MTPPlayer extends EventTarget {
     this._sequencer = new MTPSequencer(song);
     this._synth.silenceAll();
 
-    // Pre-warm instruments if audio engine is already initialised
+    // Pre-warm all instruments and voice changes if audio engine is already initialised
     if (this._initialized) {
-      const programs = new Set();
-      for (let ch = 0; ch < 16; ch++) {
-        const d = song.channelDefs[ch];
-        if (d && d.startvoice > 0) programs.add(d.startvoice - 1);
-      }
-      for (const v of song.voicechange) if (v > 0) programs.add(v - 1);
-      this._synth.preloadPrograms([...programs]);
+      const programs = this._extractSongPrograms(song);
+      this._synth.preloadPrograms(programs);
     }
 
     this._emit('loaded', { songname: song.songname, lastpos: song.lastpos });
@@ -129,14 +187,10 @@ export class MTPPlayer extends EventTarget {
     // Create / resume AudioContext here — always triggered by a direct user gesture
     await this._ensureAudioContext();
 
-    // Kick off instrument pre-loads now that we have an AudioContext
+    // Kick off instrument pre-loads for all initial voices, voice changes, and percussion
     if (this._song) {
-      const programs = new Set();
-      for (const def of this._song.channelDefs) {
-        if (def.startvoice > 0) programs.add(def.startvoice - 1);
-      }
-      for (const v of this._song.voicechange) if (v > 0) programs.add(v - 1);
-      this._synth.preloadPrograms([...programs]);
+      const programs = this._extractSongPrograms(this._song);
+      await this._synth.preloadPrograms(programs);
     }
 
     // Wait for any in-flight instrument loads
@@ -145,6 +199,7 @@ export class MTPPlayer extends EventTarget {
     }
 
     if (!this._paused) this._sequencer.reset();
+    this._synth.resumeGains();
     this._playing = true;
     this._paused  = false;
     this._nextTickTime = this._ctx.currentTime;
@@ -237,17 +292,13 @@ export class MTPPlayer extends EventTarget {
     return this._synth.percussionMode;
   }
 
-  /** @param {string} bankKey  'fatboy' | 'fluidr3' | 'musyngkite' */
-  setSoundfontBank(bankKey) {
+  /** @param {string} bankKey */
+  async setSoundfontBank(bankKey) {
     this._synth.setSoundfontBank(bankKey);
     // Pre-warm instruments in the new soundfont
     if (this._song && this._initialized) {
-      const programs = new Set();
-      for (const def of this._song.channelDefs) {
-        if (def.startvoice > 0) programs.add(def.startvoice - 1);
-      }
-      for (const v of this._song.voicechange) if (v > 0) programs.add(v - 1);
-      this._synth.preloadPrograms([...programs]);
+      const programs = this._extractSongPrograms(this._song);
+      await this._synth.preloadPrograms(programs);
     }
   }
 
@@ -283,7 +334,11 @@ export class MTPPlayer extends EventTarget {
   _runScheduler() {
     if (!this._playing) return;
 
-    while (this._nextTickTime < this._ctx.currentTime + this._lookahead) {
+    // Buffer at least 1 full pattern (16 steps) ahead into Web Audio
+    const patternDurationSec = (16 * (this._sequencer?.stepIntervalMs ?? 160)) / 1000;
+    const lookaheadSec = Math.max(patternDurationSec, this._lookahead);
+
+    while (this._nextTickTime < this._ctx.currentTime + lookaheadSec) {
       const tickResult = this._sequencer.tick();
       const { events, position, step, track, ended } = tickResult;
       const tickTime = this._nextTickTime;
@@ -298,10 +353,13 @@ export class MTPPlayer extends EventTarget {
 
       // Synchronize UI event with actual Web Audio playback time
       const delayMs = Math.max(0, (tickTime - this._ctx.currentTime) * 1000);
-      setTimeout(() => {
+      const timerId = setTimeout(() => {
+        this._pendingStepTimers?.delete(timerId);
         if (!this._playing) return;
         this._emit('step', { position, step, track, events });
       }, delayMs);
+      if (!this._pendingStepTimers) this._pendingStepTimers = new Set();
+      this._pendingStepTimers.add(timerId);
 
       // Advance by current step interval (may change mid-song via speed events)
       this._nextTickTime += this._sequencer.stepIntervalMs / 1000;
@@ -317,8 +375,14 @@ export class MTPPlayer extends EventTarget {
 
   _stopScheduler() {
     this._playing = false;
-    clearTimeout(this._scheduleTimer);
-    this._scheduleTimer = null;
+    if (this._scheduleTimer) {
+      clearTimeout(this._scheduleTimer);
+      this._scheduleTimer = null;
+    }
+    if (this._pendingStepTimers) {
+      for (const t of this._pendingStepTimers) clearTimeout(t);
+      this._pendingStepTimers.clear();
+    }
   }
 
   _dispatchMIDI(ev, time) {
@@ -333,7 +397,7 @@ export class MTPPlayer extends EventTarget {
         this._synth.programChange(ev.channel, ev.program);
         break;
       case 'cc':
-        this._synth.controlChange(ev.channel, ev.cc, ev.value);
+        this._synth.controlChange(ev.channel, ev.cc, ev.value, time);
         break;
     }
   }

@@ -152,8 +152,8 @@ export class PlayerUI {
     // SoundFont Bank select
     const sfSelect = this._$('soundfont-select');
     if (sfSelect) {
-      sfSelect.addEventListener('change', e => {
-        this.player.setSoundfontBank(e.target.value);
+      sfSelect.addEventListener('change', async e => {
+        await this.player.setSoundfontBank(e.target.value);
       });
     }
 
@@ -217,10 +217,16 @@ export class PlayerUI {
     inner.appendChild(stepHdr);
 
     for (let ch = 0; ch < 17; ch++) {
+      const trackerCh = ch + 1;
+      const isMuted = !!this.muted[trackerCh];
       const lbl = document.createElement('div');
-      lbl.className   = `ch-label${channelLabels[ch].drum ? ' ch-label--drum' : ''}`;
+      lbl.className   = `ch-label${channelLabels[ch].drum ? ' ch-label--drum' : ''}${isMuted ? ' is-muted' : ''}`;
       lbl.id          = `col-hdr-${ch}`;
       lbl.textContent = channelLabels[ch].text;
+      lbl.title       = `Channel ${channelLabels[ch].text} (Click to toggle mute)`;
+      lbl.setAttribute('role', 'button');
+      lbl.setAttribute('aria-pressed', String(isMuted));
+      lbl.addEventListener('click', () => this._toggleMute(trackerCh));
       inner.appendChild(lbl);
     }
 
@@ -368,7 +374,7 @@ export class PlayerUI {
     // VU meter hit on note events
     for (const ev of events) {
       if (ev.type === 'noteOn') {
-        const trackerCh = ev.channel === 9 ? 16 : (ev.channel < 9 ? ev.channel + 1 : ev.channel);
+        const trackerCh = ev.trackerCh || (ev.channel === 9 ? 16 : (ev.channel < 9 ? ev.channel + 1 : ev.channel));
         this.vuLevels[trackerCh] = Math.min(1, ev.velocity / 127);
       }
     }
@@ -446,24 +452,53 @@ export class PlayerUI {
 
       // Mute button
       const btn = document.createElement('button');
-      btn.className   = 'mute-btn';
+      btn.className   = `mute-btn${this.muted[ch] ? ' is-muted' : ''}`;
       btn.textContent = labels[ch - 1];
       btn.id          = `mute-${ch}`;
-      btn.setAttribute('aria-pressed', 'false');
-      btn.addEventListener('click', () => {
-        this.muted[ch] = !this.muted[ch];
-        btn.classList.toggle('is-muted', this.muted[ch]);
-        btn.setAttribute('aria-pressed', String(this.muted[ch]));
-        // Mute corresponding MIDI channel
-        if (this.player._synth) {
-          const midiCh = ch > 15 ? 9 : (ch <= 9 ? ch - 1 : ch);
-          this.player._synth.controlChange(midiCh, 7, this.muted[ch] ? 0 : 127);
-        }
-      });
+      btn.setAttribute('aria-pressed', String(!!this.muted[ch]));
+      btn.addEventListener('click', () => this._toggleMute(ch));
 
       strip.appendChild(vuWrap);
       strip.appendChild(btn);
       panel.appendChild(strip);
+    }
+  }
+
+  _toggleMute(trackerCh) {
+    this.muted[trackerCh] = !this.muted[trackerCh];
+    const isMuted = !!this.muted[trackerCh];
+    const chIdx = trackerCh - 1;
+
+    // Update bottom mute button
+    const btn = this._$(`mute-${trackerCh}`);
+    if (btn) {
+      btn.classList.toggle('is-muted', isMuted);
+      btn.setAttribute('aria-pressed', String(isMuted));
+    }
+
+    // Update top column header in pattern grid
+    const hdr = this._$(`col-hdr-${chIdx}`);
+    if (hdr) {
+      hdr.classList.toggle('is-muted', isMuted);
+      hdr.setAttribute('aria-pressed', String(isMuted));
+    }
+
+    // Dim/undim all cells in this grid column
+    for (let st = 0; st < 16; st++) {
+      const cell = this._$(`cell-${chIdx}-${st}`);
+      cell?.classList.toggle('is-muted-col', isMuted);
+    }
+
+    // Mute/unmute corresponding MIDI channel in synth
+    if (this.player._synth) {
+      const midiCh = trackerCh > 15 ? 9 : (trackerCh <= 9 ? trackerCh - 1 : trackerCh);
+      if (isMuted) {
+        this.player._synth.silenceChannel(midiCh);
+        this.player._synth.controlChange(midiCh, 7, 0);
+      } else {
+        const origVol = this.player._sequencer?.volume?.[trackerCh] ?? 64;
+        this.player._synth.controlChange(midiCh, 7, Math.min(127, origVol * 2));
+      }
     }
   }
 
