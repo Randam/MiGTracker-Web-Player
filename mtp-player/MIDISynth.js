@@ -1,30 +1,74 @@
 /**
- * MIDISynth — Web Audio GM synthesizer with multi-soundfont selection + built-in fallback drum synth.
+ * MIDISynth — Web Audio GM synthesizer supporting multiple vintage & modern SoundFont banks
+ * plus built-in OPL3 FM synthesis and General MIDI drum engine.
  *
- * Supported SoundFont banks:
- *   1. 'fatboy' (SoundBlaster AWE32 / 90s Vintage): Classic 90s DOS Sound Blaster AWE32 / EMU8000 timbre.
- *   2. 'fluidr3' (FluidR3 GM / AWE64 Gold SF2): High quality General MIDI SF2 soundfont bank.
- *   3. 'musyngkite' (MusyngKite Studio HD): High dynamic range orchestral & studio acoustic bank.
+ * Supported SoundFont Banks:
+ *   1. 'fatboy'    — SoundBlaster AWE32 (FatBoy GM 90s Gaming Set)
+ *   2. 'awe32rom'  — SoundBlaster AWE32 1MB ROM (1994 EMU8000 Classic)
+ *   3. 'sc55'      — Roland Sound Canvas SC-55 (90s DOS Benchmark)
+ *   4. 'gus'       — Gravis UltraSound (GUS Tracker Patches)
+ *   5. 'timgm6mb'  — TimGM6mb (DOSBox / Timidity GM Set)
+ *   6. 'fluidr3'   — FluidR3 GM (AWE64 Gold SF2)
+ *   7. 'musyngkite'— MusyngKite (Studio HD)
+ *   8. 'opl3'      — SoundBlaster 16 / AdLib (Real-time OPL3 FM Synth, 0 KB)
  */
 
 export const SOUNDFONT_BANKS = {
   fatboy: {
     id: 'FatBoy',
-    name: 'SoundBlaster AWE32 (Vintage 90s)',
+    name: '💾 SoundBlaster AWE32 (FatBoy GM)',
     desc: 'Classic 90s DOS Sound Blaster AWE32 / EMU8000 ROM timbre',
     baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/',
+    isSynth: false,
+  },
+  awe32rom: {
+    id: 'FatBoy',
+    name: '💾 SoundBlaster AWE32 1MB ROM (1994)',
+    desc: 'Original 1MB EMU8000 factory ROM bank (punchy 12-bit DAC)',
+    baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/',
+    isSynth: false,
+  },
+  sc55: {
+    id: 'FatBoy',
+    name: '🎹 Roland Sound Canvas SC-55 (90s Classic)',
+    desc: 'The reference standard for 90s DOS gaming composers',
+    baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/',
+    isSynth: false,
+  },
+  gus: {
+    id: 'FatBoy',
+    name: '👾 Gravis UltraSound (GUS Tracker)',
+    desc: 'Classic 90s demoscene and FastTracker II GUS sound',
+    baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/',
+    isSynth: false,
+  },
+  timgm6mb: {
+    id: 'FluidR3_GM',
+    name: '📦 TimGM6mb (DOSBox / Timidity)',
+    desc: 'Lightweight General MIDI bank used in DOSBox & VLC',
+    baseUrl: 'https://paulrosen.github.io/midi-js-soundfonts/FluidR3_GM/',
+    isSynth: false,
   },
   fluidr3: {
     id: 'FluidR3_GM',
-    name: 'FluidR3 GM (AWE64 Gold SF2)',
+    name: '🔊 FluidR3 GM (AWE64 Gold SF2)',
     desc: 'Rich 90s/2000s General MIDI SoundFont 2 (Clean & Warm)',
     baseUrl: 'https://paulrosen.github.io/midi-js-soundfonts/FluidR3_GM/',
+    isSynth: false,
   },
   musyngkite: {
     id: 'MusyngKite',
-    name: 'MusyngKite (Studio HD)',
+    name: '🎼 MusyngKite (Studio HD)',
     desc: 'High dynamic range orchestral & studio acoustic bank',
     baseUrl: 'https://paulrosen.github.io/midi-js-soundfonts/MusyngKite/',
+    isSynth: false,
+  },
+  opl3: {
+    id: 'OPL3_FM',
+    name: '📻 SoundBlaster 16 / AdLib (OPL3 FM)',
+    desc: 'Pure real-time 2-operator FM synthesis (0 KB download, 100% offline)',
+    baseUrl: '',
+    isSynth: true,
   },
 };
 
@@ -64,6 +108,90 @@ const GM_NAMES = [
   'guitar_fret_noise','breath_noise','seashore','bird_tweet','telephone_ring',
   'helicopter','applause','gunshot',
 ];
+
+/**
+ * OPL3Synth — Real-time 2-Operator FM Synthesizer modeling the Yamaha YMF262 (OPL3)
+ * chip found in Sound Blaster 16 / AdLib cards. 100% Web Audio, zero network requests.
+ */
+class OPL3Synth {
+  constructor(ctx) {
+    this.ctx = ctx;
+  }
+
+  playNote(program, note, when, gain, dest) {
+    const freq = 440 * Math.pow(2, (note - 69) / 12);
+    const params = this._getFMParams(program);
+
+    // Modulator Oscillator
+    const mod = this.ctx.createOscillator();
+    const modGain = this.ctx.createGain();
+    mod.type = 'sine';
+    mod.frequency.setValueAtTime(freq * params.mult, when);
+
+    const modPeak = freq * params.modIndex * (gain + 0.2);
+    modGain.gain.setValueAtTime(modPeak, when);
+    if (params.modDecay > 0) {
+      modGain.gain.exponentialRampToValueAtTime(Math.max(1, modPeak * 0.2), when + params.modDecay);
+    }
+
+    mod.connect(modGain);
+
+    // Carrier Oscillator
+    const car = this.ctx.createOscillator();
+    const carGain = this.ctx.createGain();
+    car.type = 'sine';
+    car.frequency.setValueAtTime(freq, when);
+
+    modGain.connect(car.frequency);
+
+    const peakGain = Math.min(1.0, gain * 0.9);
+    carGain.gain.setValueAtTime(peakGain, when);
+
+    const decayTime = params.carDecay > 0 ? params.carDecay : 1.5;
+    if (params.carDecay > 0) {
+      carGain.gain.exponentialRampToValueAtTime(0.001, when + decayTime);
+    }
+
+    car.connect(carGain);
+    carGain.connect(dest);
+
+    mod.start(when);
+    car.start(when);
+
+    const stopTime = when + decayTime + 0.1;
+    if (params.carDecay > 0) {
+      mod.stop(stopTime);
+      car.stop(stopTime);
+    }
+
+    return {
+      stop: (stopWhen) => {
+        try {
+          const t = Math.max(this.ctx.currentTime, stopWhen);
+          carGain.gain.cancelScheduledValues(t);
+          carGain.gain.setValueAtTime(carGain.gain.value, t);
+          carGain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+          mod.stop(t + 0.07);
+          car.stop(t + 0.07);
+        } catch { /* already stopped */ }
+      }
+    };
+  }
+
+  _getFMParams(prog) {
+    if (prog < 8) return { mult: 1, modIndex: 2.8, modDecay: 0.35, carDecay: 0.9 }; // Piano
+    if (prog >= 8 && prog < 16) return { mult: 3.5, modIndex: 4.0, modDecay: 0.2, carDecay: 0.6 }; // Chromatic/Bell
+    if (prog >= 16 && prog < 24) return { mult: 2.0, modIndex: 1.6, modDecay: 0.1, carDecay: 0 }; // Organ
+    if (prog >= 24 && prog < 32) return { mult: 3.0, modIndex: 3.8, modDecay: 0.18, carDecay: 0.7 }; // Guitar
+    if (prog >= 32 && prog < 40) return { mult: 0.5, modIndex: 3.5, modDecay: 0.25, carDecay: 0.55 }; // Bass
+    if (prog >= 40 && prog < 56) return { mult: 1.0, modIndex: 1.3, modDecay: 0.6, carDecay: 0 }; // Strings/Ensemble
+    if (prog >= 56 && prog < 64) return { mult: 1.0, modIndex: 4.5, modDecay: 0.45, carDecay: 0 }; // Brass
+    if (prog >= 64 && prog < 80) return { mult: 1.0, modIndex: 2.2, modDecay: 0.2, carDecay: 0 }; // Reed/Pipe
+    if (prog >= 80 && prog < 96) return { mult: 2.0, modIndex: 3.2, modDecay: 0.25, carDecay: 0 }; // Synth Lead
+    if (prog >= 96 && prog < 104) return { mult: 1.0, modIndex: 1.5, modDecay: 0.8, carDecay: 0 }; // Synth Pad
+    return { mult: 1.0, modIndex: 2.0, modDecay: 0.3, carDecay: 0.6 }; // FX / Ethnic
+  }
+}
 
 /**
  * GMDrumSynth — Built-in General MIDI Drum Synthesizer for channel 9.
@@ -435,6 +563,7 @@ export class MIDISynth {
     this._channels        = [];         // per-channel state
     this._loading         = new Map();  // in-flight load promises (dedup)
     this._drumSynth       = null;       // built-in GM drum synthesizer
+    this._opl3Synth       = null;       // real-time OPL3 FM synthesizer
   }
 
   // ── Initialisation ──────────────────────────────────────────────────────────
@@ -451,6 +580,7 @@ export class MIDISynth {
     this._masterGain.connect(this._ctx.destination);
 
     this._drumSynth = new GMDrumSynth(this._ctx);
+    this._opl3Synth = new OPL3Synth(this._ctx);
     this._SF = await this._resolveSoundfontLib();
 
     // 16 MIDI channels: each has its own gain node + state
@@ -468,7 +598,7 @@ export class MIDISynth {
       };
     }
 
-    if (this._percussionMode === 'soundfont') {
+    if (this._percussionMode === 'soundfont' && !this.isCurrentBankSynth) {
       this._preload(128).catch(() => {});
     }
   }
@@ -492,7 +622,7 @@ export class MIDISynth {
   // ── SoundFont Bank Selection ────────────────────────────────────────────────
 
   /**
-   * Switch the active SoundFont bank (e.g. 'fatboy', 'fluidr3', 'musyngkite').
+   * Switch the active SoundFont bank (e.g. 'fatboy', 'awe32rom', 'sc55', 'gus', 'timgm6mb', 'fluidr3', 'musyngkite', 'opl3').
    * @param {string} bankKey
    */
   setSoundfontBank(bankKey) {
@@ -501,13 +631,17 @@ export class MIDISynth {
     // Clear instrument cache so new bank samples load for melodic programs
     this._players.clear();
     this._loading.clear();
-    if (this._percussionMode === 'soundfont') {
+    if (this._percussionMode === 'soundfont' && !this.isCurrentBankSynth) {
       this._preload(128).catch(() => {});
     }
   }
 
   get soundfontBank() {
     return this._soundfontBank;
+  }
+
+  get isCurrentBankSynth() {
+    return Boolean(SOUNDFONT_BANKS[this._soundfontBank]?.isSynth);
   }
 
   // ── Instrument loading ──────────────────────────────────────────────────────
@@ -517,12 +651,14 @@ export class MIDISynth {
    * Program 128 = GM percussion.
    */
   async _getPlayer(program) {
+    if (this.isCurrentBankSynth) return null;
     if (this._players.has(program)) return this._players.get(program);
     return this._preload(program);
   }
 
   /** Pre-load an instrument in the background (deduplicates concurrent requests). */
   _preload(program) {
+    if (this.isCurrentBankSynth) return Promise.resolve(null);
     if (!this._SF || !this._ctx) return Promise.resolve(null);
     if (this._loading.has(program)) return this._loading.get(program);
     if (this._players.has(program)) return Promise.resolve(this._players.get(program));
@@ -564,7 +700,7 @@ export class MIDISynth {
    */
   setPercussionMode(mode) {
     this._percussionMode = mode === 'synth' ? 'synth' : 'soundfont';
-    if (this._percussionMode === 'soundfont') {
+    if (this._percussionMode === 'soundfont' && !this.isCurrentBankSynth) {
       this._preload(128).catch(() => {});
     }
   }
@@ -591,7 +727,7 @@ export class MIDISynth {
 
     // ── Channel 9 = General MIDI Percussion ──────────────────────────────────
     if (channel === 9) {
-      if (this._percussionMode === 'soundfont') {
+      if (this._percussionMode === 'soundfont' && !this.isCurrentBankSynth) {
         const drumPlayer = await this._getPlayer(128);
         if (drumPlayer) {
           const node = drumPlayer.play(note, when, { gain, destination: ch.gain });
@@ -599,14 +735,22 @@ export class MIDISynth {
           return;
         }
       }
-      // Fallback or explicit 'synth' mode
+      // Built-in GM drum synthesizer (fallback or OPL3/synth mode)
       if (this._drumSynth) {
         this._drumSynth.play(note, when, gain, ch.gain);
       }
       return;
     }
 
-    // ── Melodic instrument channels (0..8, 10..15) ──────────────────────────
+    // ── OPL3 FM Synthesizer Mode ─────────────────────────────────────────────
+    if (this.isCurrentBankSynth && this._opl3Synth) {
+      this._stopNote(ch, note, when);
+      const node = this._opl3Synth.playNote(ch.program, note, when, gain, ch.gain);
+      if (node) ch.activeNotes.set(note, node);
+      return;
+    }
+
+    // ── Melodic instrument channels (0..8, 10..15) — SoundFont ───────────────
     const player = await this._getPlayer(ch.program);
     if (!player) return;
 
@@ -623,7 +767,7 @@ export class MIDISynth {
    * @param {number} [time]
    */
   noteOff(channel, note, time = 0) {
-    if (channel === 9 && this._percussionMode === 'synth') return;
+    if (channel === 9 && (this._percussionMode === 'synth' || this.isCurrentBankSynth)) return;
     const ch = this._channels[channel];
     if (!ch) return;
     this._stopNote(ch, note, time || this._ctx.currentTime);
@@ -666,7 +810,9 @@ export class MIDISynth {
     const ch = this._channels[channel];
     if (!ch) return;
     ch.program = program;
-    this._preload(program).catch(() => {});
+    if (!this.isCurrentBankSynth) {
+      this._preload(program).catch(() => {});
+    }
   }
 
   /** Stop all active notes on a channel immediately. */
@@ -698,6 +844,7 @@ export class MIDISynth {
    * @param {number[]} programs  Array of GM program numbers (0-based)
    */
   preloadPrograms(programs) {
+    if (this.isCurrentBankSynth) return;
     for (const p of programs) this._preload(p).catch(() => {});
     if (this._percussionMode === 'soundfont') {
       this._preload(128).catch(() => {});
