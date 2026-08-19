@@ -13,7 +13,44 @@
  *   8. 'opl3'      — SoundBlaster 16 / AdLib (Real-time OPL3 FM Synth, 0 KB)
  */
 
+import { SF2Synth } from './SF2Synth.js';
+
 export const SOUNDFONT_BANKS = {
+  av_8mb: {
+    id: 'AV_8MB',
+    name: '👑 Avalon 8MB SoundFont (AV_8MB.sf2)',
+    desc: 'The original 8.4MB Sound Blaster AWE32 / EMU8000 SoundFont used to compose the Avalon soundtrack',
+    sf2Url: './assets/AV_8MB.sf2',
+    isSF2: true,
+    isSynth: false,
+    dsp: {
+      highpass: 20,
+      lowpass: 22000,
+      presenceFreq: 3400,
+      presenceGain: 1.0,
+      bassFreq: 110,
+      bassGain: 1.5,
+      warmthGain: 0.5,
+      bits: 0,
+    }
+  },
+  custom_sf2: {
+    id: 'CustomSF2',
+    name: '📂 Custom Loaded SF2 SoundFont',
+    desc: 'Custom user SoundFont 2 (.sf2) bank loaded via drag-and-drop or file picker',
+    isSF2: true,
+    isSynth: false,
+    dsp: {
+      highpass: 20,
+      lowpass: 22000,
+      presenceFreq: 3400,
+      presenceGain: 0.0,
+      bassFreq: 100,
+      bassGain: 0.0,
+      warmthGain: 0.0,
+      bits: 0,
+    }
+  },
   awe32rom: {
     id: 'FatBoy',
     name: '💾 SoundBlaster AWE32 1MB ROM (1994)',
@@ -500,50 +537,37 @@ class GMDrumSynth {
     }, durationMs);
   }
 
-  _playKick(when, gain, dest, startFreq = 155) {
+  _playKick(when, gain, dest, startFreq = 145) {
     const osc = this.ctx.createOscillator();
     const g = this.ctx.createGain();
 
     osc.type = 'sine';
     osc.frequency.setValueAtTime(startFreq, when);
-    osc.frequency.exponentialRampToValueAtTime(32, when + 0.12);
+    osc.frequency.exponentialRampToValueAtTime(36, when + 0.09);
 
-    g.gain.setValueAtTime(gain * 1.3, when);
-    g.gain.exponentialRampToValueAtTime(0.001, when + 0.35);
-
-    const clickOsc = this.ctx.createOscillator();
-    const clickGain = this.ctx.createGain();
-    clickOsc.type = 'triangle';
-    clickOsc.frequency.setValueAtTime(320, when);
-    clickOsc.frequency.exponentialRampToValueAtTime(40, when + 0.02);
-    clickGain.gain.setValueAtTime(gain * 0.8, when);
-    clickGain.gain.exponentialRampToValueAtTime(0.001, when + 0.02);
-
-    clickOsc.connect(clickGain);
-    clickGain.connect(dest);
-    clickOsc.start(when);
-    clickOsc.stop(when + 0.025);
+    g.gain.setValueAtTime(gain * 1.2, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.32);
 
     osc.connect(g);
     g.connect(dest);
     osc.start(when);
-    osc.stop(when + 0.36);
+    osc.stop(when + 0.33);
 
-    this._cleanup([clickOsc, clickGain, osc, g], 450);
+    this._cleanup([osc, g], 400);
   }
 
   _playSnare(when, gain, dest, isElectric = false) {
     const osc = this.ctx.createOscillator();
     const oscGain = this.ctx.createGain();
-    osc.type = isElectric ? 'triangle' : 'sine';
-    osc.frequency.setValueAtTime(isElectric ? 220 : 180, when);
-    osc.frequency.exponentialRampToValueAtTime(80, when + 0.1);
-    oscGain.gain.setValueAtTime(gain * 0.7, when);
-    oscGain.gain.exponentialRampToValueAtTime(0.001, when + 0.15);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(isElectric ? 210 : 175, when);
+    osc.frequency.exponentialRampToValueAtTime(65, when + 0.08);
+    oscGain.gain.setValueAtTime(gain * 0.6, when);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, when + 0.14);
     osc.connect(oscGain);
     oscGain.connect(dest);
     osc.start(when);
-    osc.stop(when + 0.16);
+    osc.stop(when + 0.15);
 
     const cleanupNodes = [osc, oscGain];
 
@@ -552,37 +576,38 @@ class GMDrumSynth {
       noise.buffer = this._noiseBuffer;
       const filter = this.ctx.createBiquadFilter();
       filter.type = 'highpass';
-      filter.frequency.setValueAtTime(1000, when);
+      filter.frequency.setValueAtTime(1400, when);
+      filter.Q.value = 0.7;
 
       const noiseGain = this.ctx.createGain();
-      noiseGain.gain.setValueAtTime(gain * 0.9, when);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, when + 0.22);
+      noiseGain.gain.setValueAtTime(gain * 0.75, when);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, when + 0.20);
 
       noise.connect(filter);
       filter.connect(noiseGain);
       noiseGain.connect(dest);
       noise.start(when);
-      noise.stop(when + 0.23);
+      noise.stop(when + 0.21);
       cleanupNodes.push(noise, filter, noiseGain);
     }
 
-    this._cleanup(cleanupNodes, 350);
+    this._cleanup(cleanupNodes, 300);
   }
 
   _playHiHat(when, gain, dest, isOpen) {
     if (!this._noiseBuffer) return;
-    const dur = isOpen ? 0.35 : 0.06;
+    const dur = isOpen ? 0.30 : 0.05;
 
     const noise = this.ctx.createBufferSource();
     noise.buffer = this._noiseBuffer;
 
     const filter = this.ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(8500, when);
-    filter.Q.value = 3.0;
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(6500, when);
+    filter.Q.value = 0.7;
 
     const g = this.ctx.createGain();
-    g.gain.setValueAtTime(gain * 0.8, when);
+    g.gain.setValueAtTime(gain * 0.65, when);
     g.gain.exponentialRampToValueAtTime(0.001, when + dur);
 
     noise.connect(filter);
@@ -596,17 +621,18 @@ class GMDrumSynth {
 
   _playCrash(when, gain, dest) {
     if (!this._noiseBuffer) return;
-    const dur = 1.2;
+    const dur = 1.1;
 
     const noise = this.ctx.createBufferSource();
     noise.buffer = this._noiseBuffer;
 
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'highpass';
-    filter.frequency.setValueAtTime(5000, when);
+    filter.frequency.setValueAtTime(4500, when);
+    filter.Q.value = 0.7;
 
     const g = this.ctx.createGain();
-    g.gain.setValueAtTime(gain * 0.8, when);
+    g.gain.setValueAtTime(gain * 0.7, when);
     g.gain.exponentialRampToValueAtTime(0.001, when + dur);
 
     noise.connect(filter);
@@ -615,42 +641,31 @@ class GMDrumSynth {
     noise.start(when);
     noise.stop(when + dur + 0.01);
 
-    this._cleanup([noise, filter, g], 1400);
+    this._cleanup([noise, filter, g], 1300);
   }
 
   _playRide(when, gain, dest) {
-    const osc1 = this.ctx.createOscillator();
-    const oscGain = this.ctx.createGain();
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(3100, when);
-    oscGain.gain.setValueAtTime(gain * 0.3, when);
-    oscGain.gain.exponentialRampToValueAtTime(0.001, when + 0.6);
-    osc1.connect(oscGain);
-    oscGain.connect(dest);
-    osc1.start(when);
-    osc1.stop(when + 0.61);
+    if (!this._noiseBuffer) return;
+    const dur = 0.65;
 
-    const cleanupNodes = [osc1, oscGain];
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(6000, when);
+    filter.Q.value = 0.7;
 
-    if (this._noiseBuffer) {
-      const noise = this.ctx.createBufferSource();
-      noise.buffer = this._noiseBuffer;
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(9000, when);
-      filter.Q.value = 4.0;
-      const g = this.ctx.createGain();
-      g.gain.setValueAtTime(gain * 0.4, when);
-      g.gain.exponentialRampToValueAtTime(0.001, when + 0.5);
-      noise.connect(filter);
-      filter.connect(g);
-      g.connect(dest);
-      noise.start(when);
-      noise.stop(when + 0.51);
-      cleanupNodes.push(noise, filter, g);
-    }
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(gain * 0.5, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + dur);
 
-    this._cleanup(cleanupNodes, 800);
+    noise.connect(filter);
+    filter.connect(g);
+    g.connect(dest);
+    noise.start(when);
+    noise.stop(when + dur + 0.01);
+
+    this._cleanup([noise, filter, g], 800);
   }
 
   _playTom(when, gain, dest, note) {
@@ -1013,6 +1028,7 @@ export class MIDISynth {
 
     this._drumSynth = new GMDrumSynth(this._ctx);
     this._opl3Synth = new OPL3Synth(this._ctx);
+    this._sf2Synth  = new SF2Synth(this._ctx);
     this._SF = await this._resolveSoundfontLib();
 
     // 16 MIDI channels: each has its own gain node connected into the DSP Chain
@@ -1121,6 +1137,22 @@ export class MIDISynth {
     return Boolean(SOUNDFONT_BANKS[this._soundfontBank]?.isSynth);
   }
 
+  get isCurrentBankSF2() {
+    return Boolean(SOUNDFONT_BANKS[this._soundfontBank]?.isSF2);
+  }
+
+  get sf2Synth() {
+    return this._sf2Synth;
+  }
+
+  async loadCustomSF2(buffer, name = 'Custom SF2') {
+    if (!this._sf2Synth) this._sf2Synth = new SF2Synth(this._ctx);
+    await this._sf2Synth.loadFromArrayBuffer(buffer, name);
+    SOUNDFONT_BANKS.custom_sf2.name = `📂 ${name}`;
+    SOUNDFONT_BANKS.custom_sf2.desc = `Custom SoundFont 2 (${name}) loaded into memory`;
+    this.setSoundfontBank('custom_sf2');
+  }
+
   // ── Instrument loading ──────────────────────────────────────────────────────
 
   /**
@@ -1128,14 +1160,14 @@ export class MIDISynth {
    * Program 128 = GM percussion.
    */
   async _getPlayer(program) {
-    if (this.isCurrentBankSynth) return null;
+    if (this.isCurrentBankSynth || this.isCurrentBankSF2) return null;
     if (this._players.has(program)) return this._players.get(program);
     return this._preload(program);
   }
 
   /** Pre-load an instrument in the background (deduplicates concurrent requests). */
   _preload(program) {
-    if (this.isCurrentBankSynth) return Promise.resolve(null);
+    if (this.isCurrentBankSynth || this.isCurrentBankSF2) return Promise.resolve(null);
     if (!this._SF || !this._ctx) return Promise.resolve(null);
     if (this._loading.has(program)) return this._loading.get(program);
     if (this._players.has(program)) return Promise.resolve(this._players.get(program));
@@ -1149,11 +1181,17 @@ export class MIDISynth {
 
     console.log(`[MIDISynth] ⏳ Loading instrument [Prog ${program}: "${name}"] from ${url}...`);
 
-    const promise = this._SF.instrument(this._ctx, name, {
+    const loadPromise = this._SF.instrument(this._ctx, name, {
       soundfont: bank.id,
       format:    this._soundfontFormat,
       nameToUrl: () => url,
-    }).then(player => {
+    });
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout loading instrument [${name}] after 10s`)), 10000)
+    );
+
+    const promise = Promise.race([loadPromise, timeoutPromise]).then(player => {
       this._players.set(program, player);
       this._loading.delete(program);
       console.log(`%c[MIDISynth]  ✓ Loaded instrument [Prog ${program}: "${name}"] successfully for "${bank.name}"`, 'color:#39ff14');
@@ -1204,6 +1242,19 @@ export class MIDISynth {
 
     // ── Channel 9 = General MIDI Percussion ──────────────────────────────────
     if (channel === 9) {
+      // Debounce duplicate identical drum hits scheduled within 8ms of each other
+      if (!this._lastDrumNotes) this._lastDrumNotes = new Map();
+      const prevTime = this._lastDrumNotes.get(note);
+      if (prevTime !== undefined && Math.abs(prevTime - when) < 0.008) {
+        return;
+      }
+      this._lastDrumNotes.set(note, when);
+
+      if (this.isCurrentBankSF2 && this._sf2Synth?.isLoaded) {
+        this._sf2Synth.playNote(9, 128, note, velocity, when, ch.gain);
+        return;
+      }
+
       if (this._soundfontBank === 'tabla') {
         if (this._drumSynth) {
           this._drumSynth.playTabla(note, when, gain, ch.gain);
@@ -1213,7 +1264,7 @@ export class MIDISynth {
       if (this._percussionMode === 'soundfont' && !this.isCurrentBankSynth) {
         const drumPlayer = this._players.get(128);
         if (drumPlayer) {
-          const node = drumPlayer.play(note, when, { gain, duration: 1.5, destination: ch.gain });
+          const node = drumPlayer.play(note, when, { gain, loop: false, destination: ch.gain });
           if (node?.source) {
             node.source.onended = () => {
               try {
@@ -1236,6 +1287,13 @@ export class MIDISynth {
     // ── Melodic tracker channels: strictly 1 active voice per tracker channel ──
     // Immediately stop and cut off the previous note at timestamp 'when'
     this._stopNote(ch, undefined, when);
+
+    // ── SF2 Synthesizer Mode (AV_8MB.sf2 or Custom SF2) ─────────────────────
+    if (this.isCurrentBankSF2 && this._sf2Synth?.isLoaded) {
+      const node = this._sf2Synth.playNote(channel, ch.program, note, velocity, when, ch.gain);
+      if (node) ch.activeNotes.set(note, node);
+      return;
+    }
 
     // ── OPL3 FM Synthesizer Mode ─────────────────────────────────────────────
     if (this.isCurrentBankSynth && this._opl3Synth) {
@@ -1424,6 +1482,7 @@ export class MIDISynth {
     }
     this._players.clear();
     this._loading.clear();
+    this._lastDrumNotes?.clear();
 
     if (this._ctx) {
       const now = this._ctx.currentTime;
@@ -1461,29 +1520,71 @@ export class MIDISynth {
   /**
    * Pre-warm a set of GM programs so the first note plays without CDN latency.
    * @param {number[]} programs  Array of GM program numbers (0-based)
+   * @param {Function} [onProgress]  Progress callback ({ loaded, total, current, percent, program, bankName })
    */
-  async preloadPrograms(programs) {
+  async preloadPrograms(programs, onProgress) {
     const bank = SOUNDFONT_BANKS[this._soundfontBank];
     if (this.isCurrentBankSynth) {
       console.log(`%c[MIDISynth]  ✓ Active bank is real-time FM engine ("${bank.name}"). Zero download needed.`, 'color:#39ff14');
+      onProgress?.({ loaded: 1, total: 1, current: bank.name, percent: 100, bankName: bank.name });
+      return;
+    }
+
+    if (this.isCurrentBankSF2) {
+      if (!this._sf2Synth.isLoaded && bank?.sf2Url) {
+        onProgress?.({ loaded: 0, total: 100, current: 'Downloading AV_8MB.sf2…', percent: 0, bankName: bank.name });
+        await this._sf2Synth.loadFromURL(bank.sf2Url, onProgress);
+      }
+      onProgress?.({ loaded: 1, total: 1, current: this._sf2Synth.name, percent: 100, bankName: this._sf2Synth.name });
       return;
     }
 
     const toLoad = [...new Set(programs)];
-    if (this._percussionMode === 'soundfont') {
+    if (this._percussionMode === 'soundfont' && !toLoad.includes(128)) {
       toLoad.push(128);
     }
 
-    console.log(`%c[MIDISynth] ⏳ Preloading ${toLoad.length} instrument(s) for bank "${bank.name}"...`, 'color:#ffb700');
-    const results = await Promise.allSettled(toLoad.map(p => this._preload(p)));
-    const succeeded = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
-    const failed = results.length - succeeded;
-
-    if (failed === 0) {
-      console.log(`%c[MIDISynth]  ✓ Successfully loaded bank "${bank.name}" (${succeeded}/${toLoad.length} instruments ready).`, 'color:#39ff14;font-weight:bold');
-    } else {
-      console.warn(`[MIDISynth]  ⚠ Bank "${bank.name}" loaded with ${succeeded} ready, ${failed} failed.`);
+    const total = toLoad.length;
+    if (total === 0) {
+      onProgress?.({ loaded: 0, total: 0, current: 'Ready', percent: 100, bankName: bank.name });
+      return;
     }
+
+    console.log(`%c[MIDISynth] ⏳ Preloading ${total} instrument(s) for bank "${bank.name}"...`, 'color:#ffb700');
+
+    let completed = 0;
+    for (let i = 0; i < toLoad.length; i++) {
+      const p = toLoad[i];
+      const isPerc = (p === 128);
+      const name = isPerc ? 'Drums (Percussion Kit)' : (GM_NAMES[p] ?? `Program ${p}`);
+
+      onProgress?.({
+        loaded: completed,
+        total,
+        current: name,
+        percent: Math.round((completed / total) * 100),
+        program: p,
+        bankName: bank.name,
+      });
+
+      try {
+        await this._preload(p);
+      } catch (err) {
+        console.warn(`[MIDISynth] Could not preload instrument ${name}:`, err.message);
+      }
+
+      completed++;
+      onProgress?.({
+        loaded: completed,
+        total,
+        current: name,
+        percent: Math.round((completed / total) * 100),
+        program: p,
+        bankName: bank.name,
+      });
+    }
+
+    console.log(`%c[MIDISynth]  ✓ Finished loading bank "${bank.name}" (${completed}/${total} ready).`, 'color:#39ff14;font-weight:bold');
   }
 
   get audioContext() { return this._ctx; }

@@ -144,11 +144,18 @@ export class MTPSequencer extends EventTarget {
     const si      = step - 1; // 0-based step index
 
     // ── Drum channels (tracker ch 16 and 17) ────────────────────────────────
+    let lastDrumNote = -1;
     for (let t1 = 16; t1 <= 17; t1++) {
       const row = pattern[t1 - 1];
       if (!row) continue;
       const v = row[si] ?? 0;
-      if (v > 0  && v < 96)  events.push({ type: 'noteOn', channel: 9, trackerCh: t1, note: v, velocity: Math.min(127, this.volume[16] * 8) });
+      if (v > 0 && v < 96) {
+        // Prevent phase-cancelling/metallic double-triggering if both DR1 and DR2 have the same note on the same step
+        if (v !== lastDrumNote) {
+          events.push({ type: 'noteOn', channel: 9, trackerCh: t1, note: v, velocity: Math.min(127, this.volume[16] * 8) });
+          lastDrumNote = v;
+        }
+      }
       if (v > 95 && v < 112) this.volume[16] = v - 96;
     }
 

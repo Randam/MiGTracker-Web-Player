@@ -190,7 +190,7 @@ export class MTPPlayer extends EventTarget {
     // Kick off instrument pre-loads for all initial voices, voice changes, and percussion
     if (this._song) {
       const programs = this._extractSongPrograms(this._song);
-      await this._synth.preloadPrograms(programs);
+      await this._synth.preloadPrograms(programs, (info) => this._emit('loading-progress', info));
     }
 
     // Wait for any in-flight instrument loads
@@ -306,7 +306,7 @@ export class MTPPlayer extends EventTarget {
     // 4. Immediately load all instruments needed for the current song in this bank
     if (this._song && this._initialized) {
       const programs = this._extractSongPrograms(this._song);
-      await this._synth.preloadPrograms(programs);
+      await this._synth.preloadPrograms(programs, (info) => this._emit('loading-progress', info));
       if (this._synth._loading.size > 0) {
         await Promise.allSettled([...this._synth._loading.values()]);
       }
@@ -315,6 +315,19 @@ export class MTPPlayer extends EventTarget {
 
   get soundfontBank() {
     return this._synth.soundfontBank;
+  }
+
+  /**
+   * Load a custom SF2 SoundFont from a File or ArrayBuffer.
+   * @param {File|ArrayBuffer} fileOrBuffer
+   * @param {string} [name]
+   */
+  async loadSF2(fileOrBuffer, name) {
+    await this._ensureAudioContext();
+    const filename = name || (fileOrBuffer.name ? fileOrBuffer.name.replace(/\.sf2$/i, '') : 'Custom SF2');
+    const buffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
+    await this._synth.loadCustomSF2(buffer, filename);
+    this._emit('sf2-loaded', { name: filename, bankKey: 'custom_sf2' });
   }
 
   // ── Event system ─────────────────────────────────────────────────────────────

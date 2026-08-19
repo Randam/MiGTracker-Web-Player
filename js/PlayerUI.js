@@ -197,7 +197,7 @@ export class PlayerUI {
     if (sfSelect) {
       sfSelect.addEventListener('change', async e => {
         const bankName = sfSelect.options[sfSelect.selectedIndex]?.text || e.target.value;
-        this._showLoading(`Loading bank: ${bankName}…`);
+        this._showLoading('Loading Bank…', bankName, 0);
         try {
           await this.player.setSoundfontBank(e.target.value);
           this._setTransportState('stopped');
@@ -228,7 +228,14 @@ export class PlayerUI {
     // File input
     const fileInput = this._$('file-input');
     fileInput.addEventListener('change', e => {
-      if (e.target.files[0]) this._loadFile(e.target.files[0]);
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (/\.sf2$/i.test(file.name)) {
+        this._loadSF2(file);
+      } else {
+        this._loadFile(file);
+      }
+      e.target.value = '';
     });
 
     // Drop zone
@@ -244,7 +251,12 @@ export class PlayerUI {
       e.preventDefault();
       dropZone.classList.remove('dragover');
       const file = e.dataTransfer?.files?.[0];
-      if (file && /\.mtp$/i.test(file.name)) this._loadFile(file);
+      if (!file) return;
+      if (/\.sf2$/i.test(file.name)) {
+        this._loadSF2(file);
+      } else if (/\.mtp$/i.test(file.name)) {
+        this._loadFile(file);
+      }
     });
 
     // Player events
@@ -254,6 +266,20 @@ export class PlayerUI {
     this.player.on('pause',   () => this._setTransportState('paused'));
     this.player.on('stop',    () => this._setTransportState('stopped'));
     this.player.on('songend', () => this._setTransportState('stopped'));
+    this.player.on('sf2-loaded', ({ name, bankKey }) => {
+      const sfSelect = this._$('soundfont-select');
+      const opt = this._$('opt-custom-sf2');
+      if (sfSelect && opt) {
+        opt.textContent = `📂 ${name}`;
+        opt.style.display = 'block';
+        sfSelect.value = bankKey;
+      }
+    });
+    this.player.on('loading-progress', ({ loaded, total, current, percent, bankName }) => {
+      const title = bankName ? `LOADING ${bankName.toUpperCase()}…` : 'LOADING INSTRUMENTS…';
+      const sub = total > 0 ? `[${loaded}/${total}] ${current}` : current;
+      this._showLoading(title, sub, percent);
+    });
   }
 
   // ── Vertical Pattern Grid (Columns = Channels, Rows = Steps 00..15) ──────────
@@ -373,7 +399,7 @@ export class PlayerUI {
   // ── Event handlers ────────────────────────────────────────────────────────
 
   async _loadFile(file) {
-    this._showLoading('Parsing ' + file.name + '…');
+    this._showLoading('Loading Song…', file.name, -1);
     let failed = false;
     try {
       await this.player.loadFromFile(file);
@@ -386,7 +412,7 @@ export class PlayerUI {
   }
 
   async _loadURL(url, songTitle) {
-    this._showLoading(`Loading ${songTitle || url}…`);
+    this._showLoading('Loading Song…', songTitle || url, -1);
     let failed = false;
     try {
       await this.player.loadFromURL(url);
@@ -394,6 +420,26 @@ export class PlayerUI {
       failed = true;
       console.error('[MTPPlayer]', err);
       this._showError(err.message);
+    }
+    if (!failed) this._hideLoading();
+  }
+
+  async _loadSF2(file) {
+    this._showLoading('Loading SoundFont 2…', file.name, 0);
+    let failed = false;
+    try {
+      await this.player.loadSF2(file);
+      const sfSelect = this._$('soundfont-select');
+      const opt = this._$('opt-custom-sf2');
+      if (sfSelect && opt) {
+        opt.textContent = `📂 ${file.name.replace(/\.sf2$/i, '')}`;
+        opt.style.display = 'block';
+        sfSelect.value = 'custom_sf2';
+      }
+    } catch (err) {
+      failed = true;
+      console.error('[MTPPlayer]', err);
+      this._showError(`Could not load SF2 soundfont: ${err.message}`);
     }
     if (!failed) this._hideLoading();
   }
@@ -566,7 +612,7 @@ export class PlayerUI {
 
   async _onPlay()  {
     try {
-      this._showLoading('Loading instruments…');
+      this._showLoading('Loading Instruments…', 'Preparing audio engine…', 0);
       await this.player.play();
     } catch (err) {
       this._showError(err.message);
@@ -660,18 +706,39 @@ export class PlayerUI {
 
   // ── Loading overlay ───────────────────────────────────────────────────────
 
-  _showLoading(msg) {
+  _showLoading(title, subtext = '', percent = -1) {
     this._$('loading-overlay')?.classList.add('is-visible');
     const t = this._$('loading-text');
-    if (t) t.textContent = msg;
+    if (t) t.textContent = title;
+
+    const sub = this._$('loading-subtext');
+    if (sub) {
+      sub.textContent = subtext || '';
+      sub.style.display = subtext ? 'block' : 'none';
+    }
+
+    const wrap = this._$('loading-progress-wrap');
+    const fill = this._$('loading-progress-fill');
+    const pct = this._$('loading-progress-pct');
+
+    if (percent >= 0) {
+      if (wrap) wrap.style.display = 'flex';
+      const boundedPct = Math.max(0, Math.min(100, Math.round(percent)));
+      if (fill) fill.style.width = `${boundedPct}%`;
+      if (pct) pct.textContent = `${boundedPct}%`;
+    } else {
+      if (wrap) wrap.style.display = 'none';
+    }
   }
 
   _hideLoading() {
     this._$('loading-overlay')?.classList.remove('is-visible');
+    const fill = this._$('loading-progress-fill');
+    if (fill) fill.style.width = '0%';
   }
 
   _showError(msg) {
-    this._showLoading(`⚠ ${msg}`);
+    this._showLoading('⚠ ERROR', msg, -1);
     setTimeout(() => this._hideLoading(), 5000);
   }
 }

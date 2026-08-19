@@ -50,6 +50,24 @@ player.on('step', ({ position, step }) => {
    await music.crossfadeTo('/music/AVALON1.MTP', 1500);
    ```
 
+## Supported SoundFont Banks
+
+The player supports vintage hardware ROM profiles, real-time FM synthesis, and full SoundFont 2 (`.sf2`) banks:
+
+| Bank Option | Type | Description |
+|---|---|---|
+| `👑 Avalon 8MB SoundFont (AV_8MB.sf2)` | SoundFont 2 (`.sf2`) | Original 8.4MB AWE32 / EMU8000 bank used for the Avalon soundtrack |
+| `💾 SoundBlaster AWE32 1MB ROM` | Sample + DSP | 1994 EMU8000 factory ROM tone modeling |
+| `💾 SoundBlaster AWE32 (FatBoy GM)` | SoundFont | Full-fidelity AWE32 EMU8000 SoundFont 2 |
+| `🎹 Roland SC-55` | Sample + DSP | 90s DOS gaming benchmark |
+| `👾 Gravis UltraSound` | Sample + DSP | GUS tracker sound with high-end sparkle |
+| `📻 SB16 / AdLib (OPL3 FM)` | Real-time FM Synth | Hardware-modeled 2-op / 4-op FM synthesis |
+| `📂 Custom SF2 Bank` | SoundFont 2 (`.sf2`) | Any user-supplied `.sf2` loaded via drag-and-drop |
+
+## Loading Custom SoundFonts (.sf2)
+
+You can drag and drop any `.sf2` SoundFont file directly onto the web player. The player parses the preset tables and PCM samples in memory and routes all 16 MIDI channels and drum kits to the custom SoundFont.
+
 ## API Reference
 
 ### `new MTPPlayer(options?)`
