@@ -1284,9 +1284,9 @@ export class MIDISynth {
       return;
     }
 
-    // ── Melodic tracker channels: strictly 1 active voice per tracker channel ──
-    // Immediately stop and cut off the previous note at timestamp 'when'
-    this._stopNote(ch, undefined, when);
+    // ── Melodic tracker channels ─────────────────────────────────────────────
+    // Note: MiGTracker relies on standard MIDI polyphony to let notes (like pianos) ring out naturally
+    // when mode=false (no forced legato cutoff). We do NOT aggressively stop the previous note here.
 
     // ── SF2 Synthesizer Mode (AV_8MB.sf2 or Custom SF2) ─────────────────────
     if (this.isCurrentBankSF2 && this._sf2Synth?.isLoaded) {

@@ -182,7 +182,13 @@ export class SF2Synth {
 
     const sample = keyData.sample;
     const header = sample.header || {};
-    const gens = keyData.generators || {};
+    
+    // SF2 Spec: Generators are inherited from Instrument Global -> Preset Global -> Local Zones
+    // The parser merges local zones into `keyData.generators`. We must merge the global zones ourselves!
+    const presetGlobal = keyData.preset?.globalZone?.generators || {};
+    const instGlobal = keyData.instrument?.globalZone?.generators || {};
+    const gens = Object.assign({}, instGlobal, presetGlobal, keyData.generators || {});
+
     const audioBuf = this._getAudioBuffer(sample);
     if (!audioBuf) return null;
 
@@ -199,7 +205,10 @@ export class SF2Synth {
     // 2. Coarse tuning (Gen 51, semitones) & Fine tuning (Gen 52, cents)
     const coarseTune = getGenValue(gens, 51) || 0;
     const fineTune = getGenValue(gens, 52) || 0;
-    const scaleTuning = getGenValue(gens, 56) ?? 100;
+    
+    // Drum samples usually play at their natural pitch regardless of the MIDI key pressed.
+    // If scaleTuning is not explicitly set, default to 0 for percussion, 100 for melodic.
+    const scaleTuning = getGenValue(gens, 56) ?? (isPercussion ? 0 : 100);
     const pitchCorrection = header.pitchCorrection || 0;
 
     // Total cents offset from sample recording pitch
@@ -209,11 +218,15 @@ export class SF2Synth {
     source.playbackRate.setValueAtTime(Math.max(0.01, playbackRate), when);
 
     // ── Looping ─────────────────────────────────────────────────────────────
-    // Sustained instruments (Strings, Organs, Brass, Pads, Flutes) loop indefinitely while held
-    const isSustained = !isPercussion && isSustainedGMProgram(program);
+    const sampleModes = getGenValue(gens, 54) || 0;
     const hasValidLoop = header.endLoop > header.startLoop && header.startLoop > 0;
+    const isSustained = !isPercussion && isSustainedGMProgram(program);
+    let shouldLoop = ((sampleModes === 1 || sampleModes === 3) || isSustained) && hasValidLoop;
+    
+    // Force disable looping for drum hits to prevent machine-gun loops on improperly authored sf2 kits
+    if (isPercussion) shouldLoop = false;
 
-    if (isSustained && hasValidLoop) {
+    if (shouldLoop) {
       source.loop = true;
       const sRate = header.sampleRate || 44100;
       source.loopStart = header.startLoop / sRate;
@@ -222,16 +235,34 @@ export class SF2Synth {
       source.loop = false;
     }
 
-    // ── Dynamics & Attenuation ──────────────────────────────────────────────
-    // Initial attenuation (Gen 48, centibels: 10 cB = 1 dB)
+    // ── Dynamics & Volume Envelope (VolEnv) ─────────────────────────────────
     const attenCentibels = getGenValue(gens, 48) || 0;
     const attenGain = Math.pow(10, -attenCentibels / 200);
-
     const gainNode = this.ctx.createGain();
-    const linearGain = (velocity / 127) * attenGain * (isPercussion ? 1.0 : 1.15);
+    const peakGain = Math.pow(velocity / 127, 2) * attenGain * (isPercussion ? 1.0 : 1.15);
 
-    // Initialize gain node smoothly
-    gainNode.gain.setValueAtTime(Math.max(0.0001, linearGain), when);
+    const tc2sec = (tc) => (tc === undefined || tc <= -11950) ? 0.001 : Math.pow(2, tc / 1200);
+    const delay = tc2sec(getGenValue(gens, 33));
+    const attack = tc2sec(getGenValue(gens, 34));
+    const hold = tc2sec(getGenValue(gens, 35));
+    const decay = tc2sec(getGenValue(gens, 36));
+    let releaseTime = tc2sec(getGenValue(gens, 38));
+    
+    // Cap release time to prevent infinite ringing if envelope is malformed
+    if (releaseTime > 5.0) releaseTime = 5.0;
+
+    const sustainCB = getGenValue(gens, 37) || 0;
+    const sustainMult = Math.pow(10, -sustainCB / 200);
+    const sustainLvl = Math.max(0.0001, peakGain * sustainMult);
+    const safePeak = Math.max(0.0001, peakGain);
+
+    gainNode.gain.setValueAtTime(0.0001, when);
+    if (delay > 0.005) {
+      gainNode.gain.setValueAtTime(0.0001, when + delay);
+    }
+    gainNode.gain.linearRampToValueAtTime(safePeak, when + delay + attack);
+    gainNode.gain.setValueAtTime(safePeak, when + delay + attack + hold);
+    gainNode.gain.exponentialRampToValueAtTime(sustainLvl, when + delay + attack + hold + decay);
 
     // Connect audio chain
     source.connect(gainNode);
@@ -246,20 +277,21 @@ export class SF2Synth {
 
       const now = this.ctx.currentTime;
       const releaseStart = Math.max(now, stopWhen);
-      const releaseDuration = isSustained ? 0.08 : 0.04;
-      const releaseEnd = releaseStart + releaseDuration;
+      // Fast release for percussion or non-looping sounds that are cut off manually
+      const actualRelease = (isPercussion || !shouldLoop) ? Math.min(0.1, releaseTime) : releaseTime;
+      const releaseEnd = releaseStart + actualRelease;
 
       try {
         gainNode.gain.cancelScheduledValues(releaseStart);
-        gainNode.gain.setValueAtTime(gainNode.gain.value || linearGain, releaseStart);
-        gainNode.gain.linearRampToValueAtTime(0.0001, releaseEnd);
-        source.stop(releaseEnd + 0.01);
+        // We use setTargetAtTime for a natural RC-curve release to 0 without knowing the exact current amplitude
+        gainNode.gain.setTargetAtTime(0.0001, releaseStart, actualRelease / 3);
+        source.stop(releaseEnd + 0.1);
         setTimeout(() => {
           try {
             source.disconnect();
             gainNode.disconnect();
           } catch { /* ignore */ }
-        }, Math.max(50, (releaseEnd - now) * 1000 + 50));
+        }, Math.max(50, (releaseEnd - now) * 1000 + 150));
       } catch {
         try { source.stop(releaseStart); } catch { /* ignore */ }
       }
