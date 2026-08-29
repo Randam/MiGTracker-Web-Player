@@ -14,6 +14,7 @@
  */
 
 import { SF2Synth } from './SF2Synth.js';
+import { SpessaSynthEngine } from './SpessaSynthEngine.js';
 
 export const SOUNDFONT_BANKS = {
   av_8mb: {
@@ -958,11 +959,11 @@ function createQuantizeCurve(bits) {
 export class MIDISynth {
 
   constructor({
-    soundfontBank = 'awe32rom',   // default: SoundBlaster AWE32 1MB ROM
+    soundfontBank = 'av_8mb',     // default: 👑 Avalon 8MB SoundFont (AV_8MB.sf2)
     soundfontFormat = 'mp3',
     percussionMode = 'soundfont',  // 'soundfont' (SF2 samples) or 'synth'
   } = {}) {
-    this._soundfontBank   = SOUNDFONT_BANKS[soundfontBank] ? soundfontBank : 'awe32rom';
+    this._soundfontBank   = SOUNDFONT_BANKS[soundfontBank] ? soundfontBank : 'av_8mb';
     this._soundfontFormat = soundfontFormat;
     this._percussionMode  = percussionMode;
     this._SF              = null;  // soundfont-player library reference
@@ -1029,6 +1030,8 @@ export class MIDISynth {
     this._drumSynth = new GMDrumSynth(this._ctx);
     this._opl3Synth = new OPL3Synth(this._ctx);
     this._sf2Synth  = new SF2Synth(this._ctx);
+    this._sf2Engine = new SpessaSynthEngine(this._ctx);
+    this._sf2Engine.connect(this._dspHighpass);
     this._SF = await this._resolveSoundfontLib();
 
     // 16 MIDI channels: each has its own gain node connected into the DSP Chain
@@ -1130,7 +1133,7 @@ export class MIDISynth {
   }
 
   get currentBankInfo() {
-    return SOUNDFONT_BANKS[this._soundfontBank] || SOUNDFONT_BANKS.awe32rom;
+    return SOUNDFONT_BANKS[this._soundfontBank] || SOUNDFONT_BANKS.av_8mb;
   }
 
   get isCurrentBankSynth() {
@@ -1151,6 +1154,26 @@ export class MIDISynth {
     SOUNDFONT_BANKS.custom_sf2.name = `📂 ${name}`;
     SOUNDFONT_BANKS.custom_sf2.desc = `Custom SoundFont 2 (${name}) loaded into memory`;
     this.setSoundfontBank('custom_sf2');
+  }
+
+  /** Initialize programs and CC7 channel volumes for all channels before playback starts. */
+  initializeSongChannels(song) {
+    if (!song || !song.channelDefs) return;
+
+    if (this.isCurrentBankSF2 && this._sf2Engine?.isLoaded) {
+      for (let ch = 1; ch <= 15; ch++) {
+        const def = song.channelDefs[ch - 1];
+        if (!def) continue;
+        const midiCh = ch < 10 ? ch - 1 : ch;
+        const startVoice = def.startvoice > 0 ? def.startvoice - 1 : 0;
+
+        this._sf2Engine.programChange(midiCh, startVoice);
+        this._sf2Engine.controlChange(midiCh, 7, 127);
+        this._sf2Engine.controlChange(midiCh, 10, 64);
+      }
+      // Drum track volume (channel 9)
+      this._sf2Engine.controlChange(9, 7, 127);
+    }
   }
 
   // ── Instrument loading ──────────────────────────────────────────────────────
@@ -1174,7 +1197,7 @@ export class MIDISynth {
 
     const isPercussion = (program === 128);
     const name = isPercussion ? 'percussion' : (GM_NAMES[program] ?? GM_NAMES[0]);
-    const bank = SOUNDFONT_BANKS[this._soundfontBank] || SOUNDFONT_BANKS.awe32rom;
+    const bank = SOUNDFONT_BANKS[this._soundfontBank] || SOUNDFONT_BANKS.av_8mb;
     const url = isPercussion
       ? `https://paulrosen.github.io/midi-js-soundfonts/FluidR3_GM/percussion-${this._soundfontFormat}.js`
       : `${bank.baseUrl}${name}-${this._soundfontFormat}.js`;
@@ -1250,6 +1273,11 @@ export class MIDISynth {
       }
       this._lastDrumNotes.set(note, when);
 
+      if (this.isCurrentBankSF2 && this._sf2Engine?.isLoaded) {
+        this._sf2Engine.noteOn(9, note, velocity);
+        return;
+      }
+
       if (this.isCurrentBankSF2 && this._sf2Synth?.isLoaded) {
         this._sf2Synth.playNote(9, 128, note, velocity, when, ch.gain);
         return;
@@ -1288,7 +1316,12 @@ export class MIDISynth {
     // Note: MiGTracker relies on standard MIDI polyphony to let notes (like pianos) ring out naturally
     // when mode=false (no forced legato cutoff). We do NOT aggressively stop the previous note here.
 
-    // ── SF2 Synthesizer Mode (AV_8MB.sf2 or Custom SF2) ─────────────────────
+    // ── SF2 AudioWorklet Synthesizer Mode (AV_8MB.sf2) ──────────────────────
+    if (this.isCurrentBankSF2 && this._sf2Engine?.isLoaded) {
+      this._sf2Engine.noteOn(channel, note, velocity);
+      return;
+    }
+
     if (this.isCurrentBankSF2 && this._sf2Synth?.isLoaded) {
       const node = this._sf2Synth.playNote(channel, ch.program, note, velocity, when, ch.gain);
       if (node) ch.activeNotes.set(note, node);
@@ -1341,6 +1374,10 @@ export class MIDISynth {
    * @param {number} [time]
    */
   noteOff(channel, note, time = 0) {
+    if (this.isCurrentBankSF2 && this._sf2Engine?.isLoaded) {
+      this._sf2Engine.noteOff(channel, note);
+      return;
+    }
     if (channel === 9 && (this._percussionMode === 'synth' || this.isCurrentBankSynth)) return;
     const ch = this._channels[channel];
     if (!ch) return;
@@ -1378,6 +1415,10 @@ export class MIDISynth {
     const ch = this._channels[channel];
     if (!ch) return;
 
+    if (this.isCurrentBankSF2 && this._sf2Engine?.isLoaded) {
+      this._sf2Engine.controlChange(channel, cc, value);
+    }
+
     switch (cc) {
       case 7: // Channel Volume (0–127)
         ch.volume = value / 127;
@@ -1403,6 +1444,10 @@ export class MIDISynth {
     const ch = this._channels[channel];
     if (!ch) return;
     ch.program = program;
+    if (this.isCurrentBankSF2 && this._sf2Engine?.isLoaded) {
+      this._sf2Engine.programChange(channel, program);
+      return;
+    }
     if (!this.isCurrentBankSynth) {
       this._preload(program).catch(() => {});
     }
@@ -1410,6 +1455,10 @@ export class MIDISynth {
 
   /** Stop all active notes on a channel immediately. */
   silenceChannel(channel, time = 0) {
+    if (this.isCurrentBankSF2 && this._sf2Engine?.isLoaded) {
+      this._sf2Engine.silenceChannel(channel);
+      return;
+    }
     const ch = this._channels[channel];
     if (!ch || !this._ctx) return;
     const stopTime = time || this._ctx.currentTime;
@@ -1422,6 +1471,9 @@ export class MIDISynth {
    * @param {number} [fastFadeMs=20]
    */
   silenceAll(fastFadeMs = 20) {
+    if (this.isCurrentBankSF2 && this._sf2Engine?.isLoaded) {
+      this._sf2Engine.silenceAll();
+    }
     if (!this._ctx) return;
     const now = this._ctx.currentTime;
     const fadeSec = Math.max(0.005, fastFadeMs / 1000);
@@ -1531,11 +1583,11 @@ export class MIDISynth {
     }
 
     if (this.isCurrentBankSF2) {
-      if (!this._sf2Synth.isLoaded && bank?.sf2Url) {
-        onProgress?.({ loaded: 0, total: 100, current: 'Downloading AV_8MB.sf2…', percent: 0, bankName: bank.name });
-        await this._sf2Synth.loadFromURL(bank.sf2Url, onProgress);
+      if (!this._sf2Engine.isLoaded && bank?.sf2Url) {
+        onProgress?.({ loaded: 0, total: 100, current: 'Loading AudioWorklet SoundFont & AV_8MB.sf2…', percent: 0, bankName: bank.name });
+        await this._sf2Engine.loadFromURL(bank.sf2Url, onProgress);
       }
-      onProgress?.({ loaded: 1, total: 1, current: this._sf2Synth.name, percent: 100, bankName: this._sf2Synth.name });
+      onProgress?.({ loaded: 1, total: 1, current: this._sf2Engine.name, percent: 100, bankName: this._sf2Engine.name });
       return;
     }
 

@@ -191,18 +191,17 @@ export class MTPPlayer extends EventTarget {
     if (this._song) {
       const programs = this._extractSongPrograms(this._song);
       await this._synth.preloadPrograms(programs, (info) => this._emit('loading-progress', info));
-    }
-
-    // Wait for any in-flight instrument loads
-    if (this._synth._loading.size > 0) {
-      await Promise.allSettled([...this._synth._loading.values()]);
+      if (this._synth._loading.size > 0) {
+        await Promise.allSettled([...this._synth._loading.values()]);
+      }
     }
 
     if (!this._paused) this._sequencer.reset();
+    this._synth.initializeSongChannels(this._song);
     this._synth.resumeGains();
     this._playing = true;
     this._paused  = false;
-    this._nextTickTime = this._ctx.currentTime;
+    this._nextTickTime = performance.now();
     this._runScheduler();
     this._emit('play', { songname: this._song.songname });
   }
@@ -238,31 +237,33 @@ export class MTPPlayer extends EventTarget {
     const fadeSec   = (durationMs / 2) / 1000;
     const startVol  = this._synth.getMasterVolume();
 
-    // Fade out
-    if (this._playing) {
-      const now = this._ctx.currentTime;
+    // 1. Fade out
+    const now = this._ctx.currentTime;
+    if (this._synth?._masterGain) {
+      this._synth._masterGain.gain.cancelScheduledValues(now);
       this._synth._masterGain.gain.setTargetAtTime(0, now, fadeSec / 3);
-      await new Promise(r => setTimeout(r, durationMs / 2));
     }
 
-    // Load new song while faded out
-    try {
-      if (typeof urlOrFile === 'string') await this.loadFromURL(urlOrFile);
-      else                               await this.loadFromFile(urlOrFile);
-    } catch (err) {
-      console.error('MTPPlayer crossfadeTo: load failed', err);
-      this._crossfading = false;
-      return;
-    }
-
-    this._synth.setMasterVolume(0);
-    this.stop();
-    this.play();
-
-    // Fade in
-    const now2 = this._ctx.currentTime;
-    this._synth._masterGain.gain.setTargetAtTime(startVol, now2, fadeSec / 3);
     await new Promise(r => setTimeout(r, durationMs / 2));
+
+    // 2. Stop and load new song
+    this.stop();
+    if (urlOrFile instanceof File) {
+      await this.loadFromFile(urlOrFile);
+    } else {
+      await this.loadFromURL(urlOrFile);
+    }
+
+    // 3. Start playing new song
+    await this.play();
+
+    // 4. Fade in
+    const now2 = this._ctx.currentTime;
+    if (this._synth?._masterGain) {
+      this._synth._masterGain.gain.cancelScheduledValues(now2);
+      this._synth._masterGain.gain.setValueAtTime(0, now2);
+      this._synth._masterGain.gain.setTargetAtTime(startVol, now2, fadeSec / 3);
+    }
 
     this._crossfading = false;
   }
@@ -330,11 +331,19 @@ export class MTPPlayer extends EventTarget {
     this._emit('sf2-loaded', { name: filename, bankKey: 'custom_sf2' });
   }
 
-  // ── Event system ─────────────────────────────────────────────────────────────
+  // ── Events ──────────────────────────────────────────────────────────────────
 
   /**
-   * Register an event listener with a simplified callback signature.
-   * Events: 'loaded', 'play', 'pause', 'stop', 'step', 'songend'
+   * Subscribe to player events:
+   *   'play'             — { songname }
+   *   'pause'            — {}
+   *   'stop'             — {}
+   *   'songend'          — {}
+   *   'step'             — { position, step, track, channels }
+   *   'loaded'           — { songname, channels, durationSec, ... }
+   *   'loading-progress' — { loaded, total, current, percent }
+   *   'sf2-loaded'       — { name, bankKey }
+   *
    * @param {string}   event
    * @param {Function} handler  Called with event.detail
    * @returns {this}
@@ -353,48 +362,32 @@ export class MTPPlayer extends EventTarget {
   get lastPosition()    { return this._song?.lastpos ?? 0; }
   get audioContext()    { return this._ctx; }
 
-  // ── Look-ahead scheduler ─────────────────────────────────────────────────────
+  // ── High-Precision Drift-Compensated Step Scheduler ──────────────────────────
 
   _runScheduler() {
     if (!this._playing) return;
 
-    // Buffer at least 1 full pattern (16 steps) ahead into Web Audio
-    const patternDurationSec = (16 * (this._sequencer?.stepIntervalMs ?? 160)) / 1000;
-    const lookaheadSec = Math.max(patternDurationSec, this._lookahead);
+    const tickResult = this._sequencer.tick();
+    const { events, position, step, track, ended } = tickResult;
 
-    while (this._nextTickTime < this._ctx.currentTime + lookaheadSec) {
-      const tickResult = this._sequencer.tick();
-      const { events, position, step, track, ended } = tickResult;
-      const tickTime = this._nextTickTime;
-
-      if (ended) {
-        this.stop();
-        this._emit('songend', {});
-        return;
-      }
-
-      for (const ev of events) this._dispatchMIDI(ev, tickTime);
-
-      // Synchronize UI event with actual Web Audio playback time
-      const delayMs = Math.max(0, (tickTime - this._ctx.currentTime) * 1000);
-      const timerId = setTimeout(() => {
-        this._pendingStepTimers?.delete(timerId);
-        if (!this._playing) return;
-        this._emit('step', { position, step, track, events });
-      }, delayMs);
-      if (!this._pendingStepTimers) this._pendingStepTimers = new Set();
-      this._pendingStepTimers.add(timerId);
-
-      // Advance by current step interval (may change mid-song via speed events)
-      this._nextTickTime += this._sequencer.stepIntervalMs / 1000;
-
-      // Safety guard against runaway ticks if interval is tiny
-      if (this._nextTickTime <= this._ctx.currentTime) {
-        this._nextTickTime = this._ctx.currentTime + 0.01;
-      }
+    if (ended) {
+      this.stop();
+      this._emit('songend', {});
+      return;
     }
 
-    this._scheduleTimer = setTimeout(() => this._runScheduler(), this._scheduleInterval);
+    for (const ev of events) {
+      this._dispatchMIDI(ev);
+    }
+
+    this._emit('step', { position, step, track, events });
+
+    const stepInterval = this._sequencer.stepIntervalMs;
+    this._nextTickTime += stepInterval;
+
+    // Self-adjusting timer drift compensation
+    const delay = Math.max(0, this._nextTickTime - performance.now());
+    this._scheduleTimer = setTimeout(() => this._runScheduler(), delay);
   }
 
   _stopScheduler() {

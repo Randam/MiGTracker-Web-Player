@@ -14,6 +14,17 @@
   <!-- soundfont-player UMD build → exposes window.Soundfont before the ES module boots -->
   <script src="https://cdn.jsdelivr.net/npm/soundfont-player/dist/soundfont-player.min.js"></script>
 
+  <!-- Import map for bare module specifiers (spessasynth_core, spessasynth_lib, stb-vorbis) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "spessasynth_core": "./mtp-player/lib/spessasynth_core.js",
+      "spessasynth_lib": "./mtp-player/lib/spessasynth_lib.js",
+      "stb-vorbis": "./mtp-player/lib/stb_vorbis.js"
+    }
+  }
+  </script>
+
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -72,12 +83,13 @@
       </div>
 
       <button id="btn-drum-mode" class="transport__btn" title="Toggle Percussion Mode (SoundFont samples vs Web Audio synth)">🥁 DRUMS: SF2</button>
+      <button id="btn-toggle-instr" class="transport__btn is-active" title="Toggle Channel Instrument Inspector Panel">🎹 INSTRUMENTS</button>
 
       <div class="transport__bank-select">
         <label for="soundfont-select" class="transport__label">BANK</label>
         <select id="soundfont-select" class="transport__select" title="Choose SoundFont Bank">
-          <option value="av_8mb">👑 Avalon 8MB SoundFont (AV_8MB.sf2)</option>
-          <option value="awe32rom" selected>💾 SoundBlaster AWE32 1MB ROM (1994)</option>
+          <option value="av_8mb" selected>👑 Avalon 8MB SoundFont (AV_8MB.sf2)</option>
+          <option value="awe32rom">💾 SoundBlaster AWE32 1MB ROM (1994)</option>
           <option value="fatboy">💾 SoundBlaster AWE32 (FatBoy GM)</option>
           <option value="sc55">🎹 Roland Sound Canvas SC-55 (90s Classic)</option>
           <option value="gus">👾 Gravis UltraSound (GUS Tracker)</option>
@@ -106,6 +118,20 @@
     <section aria-label="Pattern visualizer">
       <div id="pattern-grid" class="pattern-grid" role="grid" aria-label="Pattern data grid">
         <!-- Built dynamically by PlayerUI.js -->
+      </div>
+    </section>
+
+    <!-- ── Live Channel Instruments Inspector ── -->
+    <section id="instr-inspector" class="instr-inspector" aria-label="Channel instrument assignments">
+      <div class="instr-inspector__header">
+        <div class="instr-inspector__title">
+          <span class="instr-inspector__icon">🎹</span>
+          <span>LIVE CHANNEL INSTRUMENT MAP</span>
+        </div>
+        <span class="instr-inspector__hint">Updates live when mid-song program changes (I00–I19) execute</span>
+      </div>
+      <div id="instr-inspector-grid" class="instr-inspector__grid">
+        <!-- Populated dynamically by PlayerUI.js -->
       </div>
     </section>
 

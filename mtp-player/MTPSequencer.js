@@ -39,10 +39,10 @@ export class MTPSequencer extends EventTarget {
 
   _reset() {
     const s = this.song;
-    this.speed       = s.startspeed;
-    this.number      = 1;   // current song position  (1-based, follows position[])
-    this.step        = 1;   // current step within pattern (1-based, 1..16)
-    this.plusvalue   = 0;   // global transpose semitones
+    this.speed        = s.startspeed;
+    this.number       = 1;   // current song position  (1-based, follows position[])
+    this.step         = 1;   // current step within pattern (1-based, 1..16)
+    this.plusvalue    = new Int8Array(16); // per-channel transpose semitones [1..15]
     this.endofpattern = false;
 
     // Per-channel state arrays — index 1..15 for music, 16 for drums
@@ -85,15 +85,18 @@ export class MTPSequencer extends EventTarget {
     const trackNum    = this.song.positions[currentPos - 1]; // 1-based pattern index
     const events      = this._playNextStep(trackNum, currentStep);
 
-    // On very first tick, prepend program-change events for all channels
+    // On very first tick, prepend program-change and baseline CC7 events for all channels
     if (this._firstTick) {
       this._firstTick = false;
       const inits = [];
       for (let ch = 1; ch <= 15; ch++) {
+        const midiCh = this._midiCh(ch);
         if (this.voice[ch] > 0) {
-          inits.push({ type: 'programChange', channel: this._midiCh(ch), program: this.voice[ch] - 1 });
+          inits.push({ type: 'programChange', channel: midiCh, program: this.voice[ch] - 1 });
         }
+        inits.push({ type: 'cc', channel: midiCh, cc: 7, value: 127 });
       }
+      inits.push({ type: 'cc', channel: 9, cc: 7, value: 127 });
       events.unshift(...inits);
     }
 
@@ -152,7 +155,8 @@ export class MTPSequencer extends EventTarget {
       if (v > 0 && v < 96) {
         // Prevent phase-cancelling/metallic double-triggering if both DR1 and DR2 have the same note on the same step
         if (v !== lastDrumNote) {
-          events.push({ type: 'noteOn', channel: 9, trackerCh: t1, note: v, velocity: Math.min(127, this.volume[16] * 8) });
+          const drumVelocity = Math.min(127, Math.max(1, Math.round(this.volume[16] * 8.46)));
+          events.push({ type: 'noteOn', channel: 9, trackerCh: t1, note: v, velocity: drumVelocity });
           lastDrumNote = v;
         }
       }
@@ -179,8 +183,10 @@ export class MTPSequencer extends EventTarget {
       const v      = row[si] ?? 0;
       const midiCh = this._midiCh(t1);
 
-      // Volume
-      if (v >  96 && v < 161) this.volume[t1] = v - 97;
+      // Volume (97..160 = volume 0..63)
+      if (v >  96 && v < 161) {
+        this.volume[t1] = v - 97;
+      }
 
       // Modulation CC#1
       if (v > 160 && v < 171)
@@ -216,8 +222,8 @@ export class MTPSequencer extends EventTarget {
         if (v < 96) {
           // Note on: reset modulation first (per original)
           events.push({ type: 'cc', channel: midiCh, cc: 1, value: 0 });
-          const midiNote = Math.max(0, Math.min(127, v + 12 + this.plusvalue));
-          const velocity = Math.min(127, this.volume[t1] * 2);
+          const midiNote = Math.max(0, Math.min(127, v + 12 + (this.plusvalue[t1] || 0)));
+          const velocity = Math.min(127, Math.max(1, Math.round(this.volume[t1] * 2.016)));
           events.push({ type: 'noteOn', channel: midiCh, trackerCh: t1, note: midiNote, velocity });
           this.notehis[t1] = midiNote;
         }
@@ -229,8 +235,8 @@ export class MTPSequencer extends EventTarget {
       const row = pattern[t1 - 1];
       if (!row) continue;
       const v = row[si] ?? 0;
-      if (v > 191 && v < 209) this.plusvalue = -(v - 192);
-      if (v > 208 && v < 225) this.plusvalue =   v - 209;
+      if (v > 191 && v < 209) this.plusvalue[t1] = -(v - 192);
+      if (v > 208 && v < 225) this.plusvalue[t1] =   v - 209;
     }
 
     return events;

@@ -985,6 +985,132 @@ body {
   );
 }
 
+/* Channel Instrument Label on channel strips */
+.channel-instr {
+  font-family:      var(--font-mono);
+  font-size:        8px;
+  line-height:      1.1;
+  color:            var(--color-amber);
+  background-color: rgba(0, 0, 0, 0.7);
+  border:           1px solid rgba(255, 183, 0, 0.25);
+  border-radius:    var(--radius-sm);
+  padding:          2px 1px;
+  width:            var(--vu-bar-width);
+  text-align:       center;
+  white-space:      nowrap;
+  overflow:         hidden;
+  text-overflow:    ellipsis;
+  margin-top:       2px;
+  cursor:           default;
+  user-select:      none;
+  transition:       background-color 0.4s ease, border-color 0.4s ease, color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.channel-instr.is-changed {
+  background-color: var(--color-amber);
+  color:            #000000;
+  border-color:     #ffffff;
+  box-shadow:       var(--glow-amber-md);
+  font-weight:      var(--font-weight-bold);
+}
+
+/* Live Channel Instrument Inspector Panel */
+.instr-inspector {
+  background-color: var(--color-bg-raised);
+  border-top:       var(--border-dim);
+  border-bottom:    var(--border-dim);
+  padding:          4px var(--space-4);
+  flex-shrink:      0;
+  display:          flex;
+  flex-direction:   column;
+  gap:              4px;
+}
+
+.instr-inspector.is-hidden {
+  display: none !important;
+}
+
+.instr-inspector__header {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             var(--space-2);
+}
+
+.instr-inspector__title {
+  font-size:      var(--font-size-xs);
+  font-weight:    var(--font-weight-bold);
+  color:          var(--color-amber);
+  letter-spacing: 0.08em;
+  display:        flex;
+  align-items:    center;
+  gap:            4px;
+  text-shadow:    var(--glow-amber-sm);
+}
+
+.instr-inspector__hint {
+  font-size:      9px;
+  color:          var(--color-text-dim);
+  letter-spacing: 0.04em;
+}
+
+.instr-inspector__grid {
+  display:               grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap:                   4px;
+  max-height:            80px;
+  overflow-y:            auto;
+  padding-right:         2px;
+}
+
+.instr-cell {
+  display:          flex;
+  align-items:      center;
+  gap:              4px;
+  background-color: #050505;
+  border:           1px solid #1c2a1c;
+  border-radius:    var(--radius-sm);
+  padding:          2px 6px;
+  font-size:        10px;
+  white-space:      nowrap;
+  overflow:         hidden;
+  text-overflow:    ellipsis;
+  transition:       background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.instr-cell__ch {
+  color:       var(--color-phosphor);
+  font-weight: var(--font-weight-bold);
+  min-width:   24px;
+}
+
+.instr-cell__voice {
+  color:          var(--color-amber);
+  font-size:      9px;
+  letter-spacing: 0.04em;
+  min-width:   30px;
+}
+
+.instr-cell__name {
+  color:         #cccccc;
+  white-space:   nowrap;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+}
+
+.instr-cell.is-changed {
+  background-color: var(--color-amber);
+  border-color:     #ffffff;
+  box-shadow:       var(--glow-amber-sm);
+}
+
+.instr-cell.is-changed .instr-cell__ch,
+.instr-cell.is-changed .instr-cell__voice,
+.instr-cell.is-changed .instr-cell__name {
+  color:       #000000;
+  font-weight: var(--font-weight-bold);
+}
+
 
 /* ==========================================================================
    9. .status-bar — Bottom information bar

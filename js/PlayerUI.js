@@ -149,10 +149,11 @@ function formatCell(val, ch) {
 
 export class PlayerUI {
   constructor() {
-    this.player   = new MTPPlayer();
-    this.muted    = new Array(18).fill(false); // index 1–17
-    this.vuLevels = new Float32Array(18);      // index 1–17, decay-based VU
-    this._vuTimer = null;
+    this.player        = new MTPPlayer();
+    this.muted         = new Array(18).fill(false); // index 1–17
+    this.vuLevels      = new Float32Array(18);      // index 1–17, decay-based VU
+    this.channelVoices = new Uint8Array(18).fill(1); // 1-based current voice per tracker channel
+    this._vuTimer      = null;
 
     this._bindDOM();
     this._buildGrid();
@@ -189,6 +190,16 @@ export class PlayerUI {
         this.player.setPercussionMode(nextMode);
         drumBtn.textContent = nextMode === 'soundfont' ? '🥁 DRUMS: SF2' : '🥁 DRUMS: SYNTH';
         drumBtn.classList.toggle('is-active', nextMode === 'soundfont');
+      });
+    }
+
+    // Toggle Channel Instruments Inspector Panel
+    const instrBtn = this._$('btn-toggle-instr');
+    const instrPanel = this._$('instr-inspector');
+    if (instrBtn && instrPanel) {
+      instrBtn.addEventListener('click', () => {
+        const isHidden = instrPanel.classList.toggle('is-hidden');
+        instrBtn.classList.toggle('is-active', !isHidden);
       });
     }
 
@@ -535,11 +546,23 @@ export class PlayerUI {
     if (this._$('song-looppos')) this._$('song-looppos').textContent = String(this.player._song?.looppos ?? 0);
     if (this._$('song-speed'))   this._$('song-speed').textContent   = String(this.player._song?.startspeed ?? '—');
     this._setTransportState('stopped');
+
+    // Extract initial channel voices
+    const song = this.player._song;
+    if (song && song.channelDefs) {
+      for (let ch = 1; ch <= 15; ch++) {
+        const def = song.channelDefs[ch - 1];
+        this.channelVoices[ch] = def ? (def.startvoice > 0 ? def.startvoice : 1) : 1;
+      }
+      this.channelVoices[16] = 128;
+      this.channelVoices[17] = 128;
+    }
+
     this._buildMutePanel();
+    this._buildInspectorGrid();
     if (this._$('pos-fill')) this._$('pos-fill').style.width = '0%';
 
     // Immediately render initial pattern into the grid
-    const song = this.player._song;
     if (song && song.positions.length > 0) {
       const patIdx = song.positions[0] - 1;
       this._updateGrid(song.patterns[patIdx], -1);
@@ -581,8 +604,19 @@ export class PlayerUI {
       }
     }
 
-    // Instrument name from channel 1
+    // Update live channel instruments on mid-song program changes
     const seq = this.player._sequencer;
+    if (seq) {
+      for (let ch = 1; ch <= 15; ch++) {
+        const currentVoice = seq.voice[ch];
+        if (currentVoice > 0 && currentVoice !== this.channelVoices[ch]) {
+          this.channelVoices[ch] = currentVoice;
+          this._updateChannelInstrumentUI(ch, currentVoice, true);
+        }
+      }
+    }
+
+    // Instrument name from channel 1
     if (seq && this._$('status-instr')) {
       const prog = seq.voice[1] > 0 ? seq.voice[1] - 1 : 0;
       this._$('status-instr').textContent = `INSTR:${GM_NAMES[prog] ?? `#${prog}`}`;
@@ -660,9 +694,93 @@ export class PlayerUI {
       btn.setAttribute('aria-pressed', String(!!this.muted[ch]));
       btn.addEventListener('click', () => this._toggleMute(ch));
 
+      // Live Instrument Label on Channel Strip
+      const instrLbl = document.createElement('div');
+      instrLbl.className = 'channel-instr';
+      instrLbl.id        = `strip-instr-${ch}`;
+      
+      const v = this.channelVoices[ch] || (ch <= 15 ? 1 : 128);
+      const name = ch > 15 ? 'Percussion' : (GM_NAMES[v - 1] ?? `Prog #${v - 1}`);
+      instrLbl.textContent = ch > 15 ? 'DRUMS' : `P${v} ${name}`;
+      instrLbl.title       = ch > 15 ? 'Drum Kit (Percussion)' : `Channel ${ch}: [Voice ${v} / GM Program ${v-1}] ${name}`;
+
       strip.appendChild(vuWrap);
       strip.appendChild(btn);
+      strip.appendChild(instrLbl);
       panel.appendChild(strip);
+    }
+  }
+
+  // ── Live Channel Instrument Inspector Grid ───────────────────────────────
+
+  _buildInspectorGrid() {
+    const grid = this._$('instr-inspector-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    for (let ch = 1; ch <= 15; ch++) {
+      const cell = document.createElement('div');
+      cell.className = 'instr-cell';
+      cell.id = `insp-cell-${ch}`;
+
+      const v = this.channelVoices[ch] || 1;
+      const prog = v > 0 ? v - 1 : 0;
+      const name = GM_NAMES[prog] ?? `Prog #${prog}`;
+
+      cell.innerHTML = `
+        <span class="instr-cell__ch">C${String(ch).padStart(2, '0')}</span>
+        <span class="instr-cell__voice">P${String(v).padStart(3, '0')}</span>
+        <span class="instr-cell__name" id="insp-name-${ch}">${name}</span>
+      `;
+      cell.title = `Tracker Channel ${ch}: Voice ${v} (GM Program ${prog}: ${name})`;
+      grid.appendChild(cell);
+    }
+
+    // Drum tracks 16 & 17
+    for (let dr = 16; dr <= 17; dr++) {
+      const drIdx = dr - 15;
+      const cell = document.createElement('div');
+      cell.className = 'instr-cell instr-cell--drum';
+      cell.id = `insp-cell-${dr}`;
+      cell.innerHTML = `
+        <span class="instr-cell__ch">DR${drIdx}</span>
+        <span class="instr-cell__voice">P128</span>
+        <span class="instr-cell__name">Percussion Kit</span>
+      `;
+      cell.title = `Drum Track ${drIdx}: General MIDI Percussion Kit (Channel 9)`;
+      grid.appendChild(cell);
+    }
+  }
+
+  _updateChannelInstrumentUI(trackerCh, voiceNum, isFlash = false) {
+    const isDrum = trackerCh > 15;
+    const prog = (voiceNum > 0 && !isDrum) ? voiceNum - 1 : 0;
+    const name = isDrum ? 'Percussion Kit' : (GM_NAMES[prog] ?? `Prog #${prog}`);
+    const voiceTag = isDrum ? 'P128' : `P${String(voiceNum).padStart(3, '0')}`;
+
+    // 1. Update strip label under channel strip
+    const stripLbl = this._$(`strip-instr-${trackerCh}`);
+    if (stripLbl) {
+      stripLbl.textContent = isDrum ? 'DRUMS' : `P${voiceNum} ${name}`;
+      stripLbl.title = isDrum ? 'Drum Kit (Percussion)' : `Channel ${trackerCh}: [Voice ${voiceNum} / GM Program ${prog}] ${name}`;
+      if (isFlash) {
+        stripLbl.classList.add('is-changed');
+        setTimeout(() => stripLbl.classList.remove('is-changed'), 800);
+      }
+    }
+
+    // 2. Update inspector grid cell
+    const inspCell = this._$(`insp-cell-${trackerCh}`);
+    const inspName = this._$(`insp-name-${trackerCh}`);
+    const inspVoice = inspCell?.querySelector('.instr-cell__voice');
+    if (inspVoice) inspVoice.textContent = voiceTag;
+    if (inspName) inspName.textContent = name;
+    if (inspCell) {
+      inspCell.title = isDrum ? `Drum Track ${trackerCh - 15}: General MIDI Percussion Kit` : `Tracker Channel ${trackerCh}: Voice ${voiceNum} (GM Program ${prog}: ${name})`;
+      if (isFlash) {
+        inspCell.classList.add('is-changed');
+        setTimeout(() => inspCell.classList.remove('is-changed'), 800);
+      }
     }
   }
 
