@@ -129,6 +129,28 @@ export class MTPSequencer extends EventTarget {
     return t1 < 10 ? t1 - 1 : t1;
   }
 
+  /**
+   * Scale tracker channel volume (0..63) to MIDI velocity (40..127).
+   * Tracker volume 0 = 0 (rest), 1 = 40 (pp), 63 = 127 (fff).
+   */
+  _trackerVolToMIDI(vol) {
+    if (vol <= 0) return 0;
+    const minMidi = 40;
+    const maxMidi = 127;
+    return Math.min(maxMidi, Math.max(1, Math.round(minMidi + ((vol - 1) / 62) * (maxMidi - minMidi))));
+  }
+
+  /**
+   * Scale tracker drum volume (0..15) to MIDI velocity (45..127).
+   * Tracker drum volume 0 = 0, 1 = 45 (pp), 15 = 127 (fff).
+   */
+  _trackerDrumVolToMIDI(vol) {
+    if (vol <= 0) return 0;
+    const minMidi = 45;
+    const maxMidi = 127;
+    return Math.min(maxMidi, Math.max(1, Math.round(minMidi + ((vol - 1) / 14) * (maxMidi - minMidi))));
+  }
+
   _dispatchEvent(type, detail) {
     const ev = new Event(type);
     ev.detail = detail;
@@ -155,7 +177,7 @@ export class MTPSequencer extends EventTarget {
       if (v > 0 && v < 96) {
         // Prevent phase-cancelling/metallic double-triggering if both DR1 and DR2 have the same note on the same step
         if (v !== lastDrumNote) {
-          const drumVelocity = Math.min(127, Math.max(1, Math.round(this.volume[16] * 8.46)));
+          const drumVelocity = this._trackerDrumVolToMIDI(this.volume[16]);
           events.push({ type: 'noteOn', channel: 9, trackerCh: t1, note: v, velocity: drumVelocity });
           lastDrumNote = v;
         }
@@ -223,7 +245,7 @@ export class MTPSequencer extends EventTarget {
           // Note on: reset modulation first (per original)
           events.push({ type: 'cc', channel: midiCh, cc: 1, value: 0 });
           const midiNote = Math.max(0, Math.min(127, v + 12 + (this.plusvalue[t1] || 0)));
-          const velocity = Math.min(127, Math.max(1, Math.round(this.volume[t1] * 2.016)));
+          const velocity = this._trackerVolToMIDI(this.volume[t1]);
           events.push({ type: 'noteOn', channel: midiCh, trackerCh: t1, note: midiNote, velocity });
           this.notehis[t1] = midiNote;
         }

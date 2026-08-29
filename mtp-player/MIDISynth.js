@@ -995,7 +995,7 @@ export class MIDISynth {
 
     // Master Gain
     this._masterGain = this._ctx.createGain();
-    this._masterGain.gain.value = 0.85;
+    this._masterGain.gain.value = 1.0;
     this._masterGain.connect(this._ctx.destination);
 
     // Build Hardware DSP Filter Chain
@@ -1522,7 +1522,7 @@ export class MIDISynth {
     }
     if (this._masterGain) {
       this._masterGain.gain.cancelScheduledValues(now);
-      this._masterGain.gain.setValueAtTime(0.85, now);
+      this._masterGain.gain.setValueAtTime(this._masterVolume ?? 1.0, now);
     }
   }
 
