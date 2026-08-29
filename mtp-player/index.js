@@ -45,9 +45,8 @@ export class MTPPlayer extends EventTarget {
     this._paused           = false;
     this._ctx              = null;
     this._scheduleTimer    = null;
-    this._nextTickTime     = 0;
-    this._lookahead        = options.lookahead        ?? 0.12;
-    this._scheduleInterval = options.scheduleInterval ?? 50;
+    this._lookahead        = options.lookahead        ?? 0.500; // default 500ms lookahead buffer
+    this._scheduleInterval = options.scheduleInterval ?? 20;
     this._volume           = 1.0;
     this._loop             = true;
     this._crossfading      = false;
@@ -361,6 +360,8 @@ export class MTPPlayer extends EventTarget {
   get currentPosition() { return this._sequencer?.number ?? 0; }
   get lastPosition()    { return this._song?.lastpos ?? 0; }
   get audioContext()    { return this._ctx; }
+  get lookahead()       { return this._lookahead; }
+  set lookahead(sec)    { this._lookahead = Math.max(0.05, Math.min(2.0, sec)); }
 
   // ── High-Precision Buffered Lookahead Scheduler ─────────────────────────────
 
@@ -403,8 +404,8 @@ export class MTPPlayer extends EventTarget {
   _runScheduler() {
     if (!this._playing || !this._ctx) return;
 
-    // Buffer lookahead window of 100ms
-    const lookaheadSec = 0.100;
+    // Buffer lookahead window (default 500ms / 0.5s)
+    const lookaheadSec = this._lookahead ?? 0.500;
 
     while (this._nextTickAudioTime < this._ctx.currentTime + lookaheadSec) {
       const tickTime = this._nextTickAudioTime;
