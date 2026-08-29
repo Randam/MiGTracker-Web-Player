@@ -201,8 +201,8 @@ export class MTPPlayer extends EventTarget {
     this._synth.resumeGains();
     this._playing = true;
     this._paused  = false;
-    this._nextTickTime = performance.now();
-    this._runScheduler();
+    this._nextTickAudioTime = this._ctx.currentTime;
+    this._startScheduler();
     this._emit('play', { songname: this._song.songname });
   }
 
@@ -362,38 +362,93 @@ export class MTPPlayer extends EventTarget {
   get lastPosition()    { return this._song?.lastpos ?? 0; }
   get audioContext()    { return this._ctx; }
 
-  // ── High-Precision Drift-Compensated Step Scheduler ──────────────────────────
+  // ── High-Precision Buffered Lookahead Scheduler ─────────────────────────────
+
+  _ensureWorkerTimer() {
+    if (this._workerTimer) return;
+    try {
+      const blob = new Blob([`
+        let timer = null;
+        self.onmessage = function(e) {
+          if (e.data === 'start') {
+            if (!timer) timer = setInterval(() => self.postMessage('tick'), 15);
+          } else if (e.data === 'stop') {
+            if (timer) {
+              clearInterval(timer);
+              timer = null;
+            }
+          }
+        };
+      `], { type: 'application/javascript' });
+      this._workerTimer = new Worker(URL.createObjectURL(blob));
+      this._workerTimer.onmessage = () => {
+        if (this._playing) this._runScheduler();
+      };
+    } catch {
+      this._workerTimer = null;
+    }
+  }
+
+  _startScheduler() {
+    this._ensureWorkerTimer();
+    this._runScheduler();
+    if (this._workerTimer) {
+      this._workerTimer.postMessage('start');
+    } else {
+      if (this._scheduleTimer) clearInterval(this._scheduleTimer);
+      this._scheduleTimer = setInterval(() => this._runScheduler(), 15);
+    }
+  }
 
   _runScheduler() {
-    if (!this._playing) return;
+    if (!this._playing || !this._ctx) return;
 
-    const tickResult = this._sequencer.tick();
-    const { events, position, step, track, ended } = tickResult;
+    // Buffer lookahead window of 100ms
+    const lookaheadSec = 0.100;
 
-    if (ended) {
-      this.stop();
-      this._emit('songend', {});
-      return;
+    while (this._nextTickAudioTime < this._ctx.currentTime + lookaheadSec) {
+      const tickTime = this._nextTickAudioTime;
+      const tickResult = this._sequencer.tick();
+      const { events, position, step, track, ended } = tickResult;
+
+      if (ended) {
+        this.stop();
+        this._emit('songend', {});
+        return;
+      }
+
+      const delayMs = Math.max(0, (tickTime - this._ctx.currentTime) * 1000);
+
+      if (delayMs <= 6) {
+        for (const ev of events) this._dispatchMIDI(ev);
+        this._emit('step', { position, step, track, events });
+      } else {
+        const timerId = setTimeout(() => {
+          this._pendingStepTimers?.delete(timerId);
+          if (!this._playing) return;
+          for (const ev of events) this._dispatchMIDI(ev);
+          this._emit('step', { position, step, track, events });
+        }, delayMs);
+        if (!this._pendingStepTimers) this._pendingStepTimers = new Set();
+        this._pendingStepTimers.add(timerId);
+      }
+
+      this._nextTickAudioTime += this._sequencer.stepIntervalMs / 1000;
+
+      // Safety guard against runaway ticks if time desynchronizes
+      if (this._nextTickAudioTime < this._ctx.currentTime) {
+        this._nextTickAudioTime = this._ctx.currentTime + 0.005;
+      }
     }
-
-    for (const ev of events) {
-      this._dispatchMIDI(ev);
-    }
-
-    this._emit('step', { position, step, track, events });
-
-    const stepInterval = this._sequencer.stepIntervalMs;
-    this._nextTickTime += stepInterval;
-
-    // Self-adjusting timer drift compensation
-    const delay = Math.max(0, this._nextTickTime - performance.now());
-    this._scheduleTimer = setTimeout(() => this._runScheduler(), delay);
   }
 
   _stopScheduler() {
     this._playing = false;
+    if (this._workerTimer) {
+      this._workerTimer.postMessage('stop');
+    }
     if (this._scheduleTimer) {
-      clearTimeout(this._scheduleTimer);
+      clearInterval(this._scheduleTimer);
       this._scheduleTimer = null;
     }
     if (this._pendingStepTimers) {

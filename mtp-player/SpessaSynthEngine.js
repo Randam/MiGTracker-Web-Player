@@ -5,7 +5,14 @@
  * inside a Web Audio AudioWorklet background thread for zero stutter and zero latency.
  */
 
-import { WorkletSynthesizer } from 'spessasynth_lib';
+// A relative path, not a package specifier: spessasynth_lib is this package's own vendored
+// lib/spessasynth_lib.js, not a real installed 'spessasynth_lib' dependency (no such package
+// exists in node_modules). A bare specifier here only ever resolved by accident, when esbuild's
+// dependency pre-bundling happened to have a stale cached answer for it lying around; consumers
+// that exclude this package from optimization (as Avalon-Remake's vite.config.js now does, to
+// keep ./lib/spessasynth_processor.js's own relative AudioWorklet URL intact) get a hard
+// "Failed to resolve import" instead.
+import { WorkletSynthesizer } from './lib/spessasynth_lib.js';
 
 export class SpessaSynthEngine {
   constructor(ctx) {
