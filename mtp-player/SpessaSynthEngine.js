@@ -57,7 +57,7 @@ export class SpessaSynthEngine {
   async loadFromURL(url, onProgress) {
     await this.init();
 
-    onProgress?.({ loaded: 0, total: 100, percent: 0, status: 'Downloading AV_8MB.sf2…' });
+    onProgress?.({ loaded: 0, total: 100, percent: 0, status: `Downloading ${url.split('/').pop()}…` });
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Failed to fetch SoundFont from "${url}" (HTTP ${res.status})`);
 

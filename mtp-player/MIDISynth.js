@@ -18,10 +18,10 @@ import { SpessaSynthEngine } from './SpessaSynthEngine.js';
 
 export const SOUNDFONT_BANKS = {
   av_8mb: {
-    id: 'AV_8MB',
-    name: '👑 Avalon 8MB SoundFont (AV_8MB.sf2)',
-    desc: 'The original 8.4MB Sound Blaster AWE32 / EMU8000 SoundFont used to compose the Avalon soundtrack',
-    sf2Url: '/assets/AV_8MB.sf2',
+    id: 'AvalonSF2',
+    name: '👑 Avalon SoundFont (avalon_soundfont.sf2)',
+    desc: 'General MIDI SoundFont bank used to play back the Avalon soundtrack',
+    sf2Url: '/assets/avalon_soundfont.sf2',
     isSF2: true,
     isSynth: false,
     dsp: {
@@ -959,9 +959,10 @@ function createQuantizeCurve(bits) {
 export class MIDISynth {
 
   constructor({
-    soundfontBank = 'av_8mb',     // default: 👑 Avalon 8MB SoundFont (AV_8MB.sf2)
+    soundfontBank = 'av_8mb',     // default: 👑 Yamaha XG Sound Set (Yamaha_XG_Sound_Set.sf2)
     soundfontFormat = 'mp3',
     percussionMode = 'soundfont',  // 'soundfont' (SF2 samples) or 'synth'
+    masterVolume = 0.65,
   } = {}) {
     this._soundfontBank   = SOUNDFONT_BANKS[soundfontBank] ? soundfontBank : 'av_8mb';
     this._soundfontFormat = soundfontFormat;
@@ -969,6 +970,8 @@ export class MIDISynth {
     this._SF              = null;  // soundfont-player library reference
     this._ctx             = null;  // AudioContext
     this._masterGain      = null;  // master output gain
+    this._masterLimiter   = null;  // master dynamics peak limiter
+    this._masterVolume    = masterVolume;
     this._players         = new Map();  // GM program → soundfont player instance
     this._channels        = [];         // per-channel state
     this._loading         = new Map();  // in-flight load promises (dedup)
@@ -993,10 +996,20 @@ export class MIDISynth {
   async init(audioCtx) {
     this._ctx = audioCtx || new AudioContext();
 
-    // Master Gain
+    // Master Gain (calibrated headroom)
     this._masterGain = this._ctx.createGain();
-    this._masterGain.gain.value = 1.0;
-    this._masterGain.connect(this._ctx.destination);
+    this._masterGain.gain.value = this._masterVolume ?? 0.65;
+
+    // Master Peak Limiter (Brickwall Dynamics Compressor to prevent digital clipping/crackle)
+    this._masterLimiter = this._ctx.createDynamicsCompressor();
+    this._masterLimiter.threshold.setValueAtTime(-1.5, this._ctx.currentTime);
+    this._masterLimiter.knee.setValueAtTime(6.0, this._ctx.currentTime);
+    this._masterLimiter.ratio.setValueAtTime(20.0, this._ctx.currentTime);
+    this._masterLimiter.attack.setValueAtTime(0.002, this._ctx.currentTime);
+    this._masterLimiter.release.setValueAtTime(0.080, this._ctx.currentTime);
+
+    this._masterGain.connect(this._masterLimiter);
+    this._masterLimiter.connect(this._ctx.destination);
 
     // Build Hardware DSP Filter Chain
     this._dspHighpass = this._ctx.createBiquadFilter();
@@ -1168,11 +1181,13 @@ export class MIDISynth {
         const startVoice = def.startvoice > 0 ? def.startvoice - 1 : 0;
 
         this._sf2Engine.programChange(midiCh, startVoice);
-        this._sf2Engine.controlChange(midiCh, 7, 127);
-        this._sf2Engine.controlChange(midiCh, 10, 64);
+        this._sf2Engine.controlChange(midiCh, 7, 127);   // Channel Volume
+        this._sf2Engine.controlChange(midiCh, 10, 64);   // Pan Center
+        this._sf2Engine.controlChange(midiCh, 91, 32);   // Subtle natural reverb
       }
-      // Drum track volume (channel 9)
+      // Drum track (channel 9)
       this._sf2Engine.controlChange(9, 7, 127);
+      this._sf2Engine.controlChange(9, 91, 24);
     }
   }
 
@@ -1316,7 +1331,7 @@ export class MIDISynth {
     // Note: MiGTracker relies on standard MIDI polyphony to let notes (like pianos) ring out naturally
     // when mode=false (no forced legato cutoff). We do NOT aggressively stop the previous note here.
 
-    // ── SF2 AudioWorklet Synthesizer Mode (AV_8MB.sf2) ──────────────────────
+    // ── SF2 AudioWorklet Synthesizer Mode (Yamaha_XG_Sound_Set.sf2) ─────────
     if (this.isCurrentBankSF2 && this._sf2Engine?.isLoaded) {
       this._sf2Engine.noteOn(channel, note, velocity);
       return;
@@ -1522,7 +1537,7 @@ export class MIDISynth {
     }
     if (this._masterGain) {
       this._masterGain.gain.cancelScheduledValues(now);
-      this._masterGain.gain.setValueAtTime(this._masterVolume ?? 1.0, now);
+      this._masterGain.gain.setValueAtTime(this._masterVolume ?? 0.65, now);
     }
   }
 
@@ -1553,7 +1568,7 @@ export class MIDISynth {
       }
       if (this._masterGain) {
         this._masterGain.gain.cancelScheduledValues(now);
-        this._masterGain.gain.setValueAtTime(0.85, now);
+        this._masterGain.gain.setValueAtTime(this._masterVolume ?? 0.65, now);
       }
     }
   }
@@ -1584,7 +1599,7 @@ export class MIDISynth {
 
     if (this.isCurrentBankSF2) {
       if (!this._sf2Engine.isLoaded && bank?.sf2Url) {
-        onProgress?.({ loaded: 0, total: 100, current: 'Loading AudioWorklet SoundFont & AV_8MB.sf2…', percent: 0, bankName: bank.name });
+        onProgress?.({ loaded: 0, total: 100, current: `Loading AudioWorklet SoundFont & ${bank.sf2Url.split('/').pop()}…`, percent: 0, bankName: bank.name });
         await this._sf2Engine.loadFromURL(bank.sf2Url, onProgress);
       }
       onProgress?.({ loaded: 1, total: 1, current: this._sf2Engine.name, percent: 100, bankName: this._sf2Engine.name });

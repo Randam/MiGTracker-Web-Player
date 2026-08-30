@@ -42,7 +42,7 @@ export class MTPSequencer extends EventTarget {
     this.speed        = s.startspeed;
     this.number       = 1;   // current song position  (1-based, follows position[])
     this.step         = 1;   // current step within pattern (1-based, 1..16)
-    this.plusvalue    = new Int8Array(16); // per-channel transpose semitones [1..15]
+    this.plusvalue    = 0;   // global song transpose semitones (affects all melodic channels)
     this.endofpattern = false;
 
     // Per-channel state arrays — index 1..15 for music, 16 for drums
@@ -73,6 +73,7 @@ export class MTPSequencer extends EventTarget {
     if (this.number > this.song.lastpos) {
       if (this.song.looppos > 0) {
         this.number = this.song.looppos;
+        this.plusvalue = 0;
       } else {
         this._dispatchEvent('songend', {});
         return { events: [], position: this.number, step: this.step, track: 0, ended: true };
@@ -95,8 +96,10 @@ export class MTPSequencer extends EventTarget {
           inits.push({ type: 'programChange', channel: midiCh, program: this.voice[ch] - 1 });
         }
         inits.push({ type: 'cc', channel: midiCh, cc: 7, value: 127 });
+        inits.push({ type: 'cc', channel: midiCh, cc: 91, value: 32 }); // Subtle natural reverb
       }
       inits.push({ type: 'cc', channel: 9, cc: 7, value: 127 });
+      inits.push({ type: 'cc', channel: 9, cc: 91, value: 24 });
       events.unshift(...inits);
     }
 
@@ -185,52 +188,60 @@ export class MTPSequencer extends EventTarget {
       if (v > 95 && v < 112) this.volume[16] = v - 96;
     }
 
-    // ── Music channels — pass 1: speed + end-of-pattern detection ───────────
+    // ── Music channels — pass 1: parameters, controllers & transpose ─────────
     this.endofpattern = false;
-    for (let t1 = 1; t1 <= 15; t1++) {
-      const row = pattern[t1 - 1];
-      if (!row) continue;
-      const v = row[si] ?? 0;
-
-      if (v > 180 && v < 191) this.speed = v - 181;
-
-      // End-of-pattern: the NEXT step (si+1) contains 191
-      if (si + 1 < 16 && (row[si + 1] ?? 0) === 191) this.endofpattern = true;
-    }
-
-    // ── Music channels — pass 2: volume / mod / pan / program / notes ────────
     for (let t1 = 1; t1 <= 15; t1++) {
       const row    = pattern[t1 - 1];
       if (!row) continue;
       const v      = row[si] ?? 0;
       const midiCh = this._midiCh(t1);
 
+      // Speed (181..190)
+      if (v > 180 && v < 191) this.speed = v - 181;
+
+      // End-of-pattern: the NEXT step (si+1) contains 191
+      if (si + 1 < 16 && (row[si + 1] ?? 0) === 191) this.endofpattern = true;
+
+      // Global Transpose down (192..208)
+      if (v > 191 && v < 209) this.plusvalue = -(v - 192);
+
+      // Global Transpose up (209..224)
+      if (v > 208 && v < 225) this.plusvalue = v - 209;
+
       // Volume (97..160 = volume 0..63)
-      if (v >  96 && v < 161) {
+      if (v > 96 && v < 161) {
         this.volume[t1] = v - 97;
       }
 
-      // Modulation CC#1
+      // Modulation CC#1 (161..170)
       if (v > 160 && v < 171)
         events.push({ type: 'cc', channel: midiCh, cc: 1, value: (v - 161) * 14 });
 
-      // Pan CC#10 (GMUNIT calls this "chorus" but sends CC#10 = pan)
+      // Pan CC#10 (171..180 — labeled "chorus" in MiGTracker Pro UI)
       if (v > 170 && v < 181)
         events.push({ type: 'cc', channel: midiCh, cc: 10, value: (v - 171) * 14 });
 
-      // Program change via voicechange table
+      // Program change via voicechange table (225..245)
       if (v > 224 && v < 246) {
-        const vcIdx = v - 225; // 0-based index into voicechange[]
+        const vcIdx = v - 225;
         if (vcIdx < this.song.voicechange.length) {
           const newVoice = this.song.voicechange[vcIdx];
-          if (newVoice !== this.voice[t1]) {
+          if (newVoice > 0 && newVoice !== this.voice[t1]) {
             this.voice[t1] = newVoice;
-            events.push({ type: 'programChange', channel: midiCh, program: Math.max(0, newVoice - 1) });
+            events.push({ type: 'programChange', channel: midiCh, program: newVoice - 1 });
           }
         }
       }
+    }
 
-      // Note events (0 < v < 97 covers both notes 1–95 and note-off 96)
+    // ── Music channels — pass 2: notes ──────────────────────────────────────
+    for (let t1 = 1; t1 <= 15; t1++) {
+      const row    = pattern[t1 - 1];
+      if (!row) continue;
+      const v      = row[si] ?? 0;
+      const midiCh = this._midiCh(t1);
+
+      // Note events (0 < v < 97 covers notes 1–95 and note-off 96)
       if (v > 0 && v < 97) {
         if (this.mode[t1] || v === 96) {
           // Legato mode or explicit note-off → send NoteOff for previous note
@@ -244,21 +255,12 @@ export class MTPSequencer extends EventTarget {
         if (v < 96) {
           // Note on: reset modulation first (per original)
           events.push({ type: 'cc', channel: midiCh, cc: 1, value: 0 });
-          const midiNote = Math.max(0, Math.min(127, v + 12 + (this.plusvalue[t1] || 0)));
+          const midiNote = Math.max(0, Math.min(127, v + 12 + this.plusvalue));
           const velocity = this._trackerVolToMIDI(this.volume[t1]);
           events.push({ type: 'noteOn', channel: midiCh, trackerCh: t1, note: midiNote, velocity });
           this.notehis[t1] = midiNote;
         }
       }
-    }
-
-    // ── Music channels — pass 3: transpose ──────────────────────────────────
-    for (let t1 = 1; t1 <= 15; t1++) {
-      const row = pattern[t1 - 1];
-      if (!row) continue;
-      const v = row[si] ?? 0;
-      if (v > 191 && v < 209) this.plusvalue[t1] = -(v - 192);
-      if (v > 208 && v < 225) this.plusvalue[t1] =   v - 209;
     }
 
     return events;
