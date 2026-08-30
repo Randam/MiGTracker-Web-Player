@@ -21,7 +21,7 @@ export const SOUNDFONT_BANKS = {
     id: 'AV_8MB',
     name: '👑 Avalon 8MB SoundFont (AV_8MB.sf2)',
     desc: 'The original 8.4MB Sound Blaster AWE32 / EMU8000 SoundFont used to compose the Avalon soundtrack',
-    sf2Url: './assets/AV_8MB.sf2',
+    sf2Url: '/assets/AV_8MB.sf2',
     isSF2: true,
     isSynth: false,
     dsp: {
