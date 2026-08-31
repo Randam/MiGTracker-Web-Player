@@ -123,10 +123,10 @@ export class SpessaSynthEngine {
     await this.synth.isReady;
 
     this.isLoaded = true;
-    const filename = url.split('/').pop().replace(/\.sf2$/i, '');
-    this.name = `SpessaSynth (${filename})`;
+    const bankName = filename.replace(/\.sf2$/i, '');
+    this.name = `SpessaSynth (${bankName})`;
 
-    console.log(`%c[SpessaSynth]  ✓ SoundFont "${filename}" loaded into AudioWorklet engine!`, 'color:#39ff14;font-weight:bold');
+    console.log(`%c[SpessaSynth]  ✓ SoundFont "${bankName}" loaded into AudioWorklet engine!`, 'color:#39ff14;font-weight:bold');
   }
 
   noteOn(channel, note, velocity) {
