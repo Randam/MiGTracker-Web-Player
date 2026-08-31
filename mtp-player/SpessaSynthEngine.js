@@ -57,9 +57,37 @@ export class SpessaSynthEngine {
   async loadFromURL(url, onProgress) {
     await this.init();
 
-    onProgress?.({ loaded: 0, total: 100, percent: 0, status: `Downloading ${url.split('/').pop()}…` });
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Failed to fetch SoundFont from "${url}" (HTTP ${res.status})`);
+    const filename = url.split('/').pop();
+    onProgress?.({ loaded: 0, total: 100, percent: 0, status: `Downloading ${filename}…` });
+
+    // Robust candidate paths to resolve correctly on local servers, subdirectories, and GitHub Pages
+    const baseUrl = typeof window !== 'undefined' ? window.location.href : import.meta.url;
+    const candidates = [
+      url,
+      new URL(url, baseUrl).href,
+      new URL(`./assets/${filename}`, baseUrl).href,
+      new URL(`./public/assets/${filename}`, baseUrl).href,
+      new URL(`../assets/${filename}`, import.meta.url).href,
+    ];
+
+    const uniqueCandidates = [...new Set(candidates)];
+    let res = null;
+
+    for (const candidate of uniqueCandidates) {
+      try {
+        const testRes = await fetch(candidate);
+        if (testRes.ok) {
+          res = testRes;
+          break;
+        }
+      } catch {
+        // try next candidate
+      }
+    }
+
+    if (!res || !res.ok) {
+      throw new Error(`Failed to fetch SoundFont from "${url}". Checked paths: ${uniqueCandidates.join(', ')}`);
+    }
 
     const contentLength = +(res.headers.get('content-length') || 0);
     let arrayBuffer;

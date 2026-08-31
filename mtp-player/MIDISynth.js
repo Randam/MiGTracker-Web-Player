@@ -21,7 +21,7 @@ export const SOUNDFONT_BANKS = {
     id: 'AvalonSF2',
     name: '👑 Avalon SoundFont (avalon_soundfont.sf2)',
     desc: 'General MIDI SoundFont bank used to play back the Avalon soundtrack',
-    sf2Url: '/assets/avalon_soundfont.sf2',
+    sf2Url: './assets/avalon_soundfont.sf2',
     isSF2: true,
     isSynth: false,
     dsp: {
