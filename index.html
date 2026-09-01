@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MiGTracker Pro Web Player</title>
   <link rel="icon" href="favicon.ico" sizes="any" />
-  <meta name="description" content="Browser-based replayer for MiGTracker Pro .MTP music files using General MIDI SF2 soundfonts via Web Audio API." />
+  <meta name="description" content="MS-DOS Blue Screen replayer for MiGTracker Pro .MTP music files using General MIDI SF2 soundfonts via Web Audio API." />
 
-  <!-- IBM Plex Mono via Google Fonts (CSS also imports this, belt-and-suspenders) -->
+  <!-- Google Fonts: IBM Plex Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
 
   <!-- soundfont-player UMD build → exposes window.Soundfont before the ES module boots -->
   <script src="https://cdn.jsdelivr.net/npm/soundfont-player/dist/soundfont-player.min.js"></script>
@@ -27,108 +28,119 @@
 
   <link rel="stylesheet" href="css/style.css" />
 </head>
-<body>
-  <div id="app">
+<body class="dos-body">
+  <div id="app" class="dos-app">
 
-    <!-- ── Header ── -->
-    <header class="header">
+    <!-- ── Top Header Bar ── -->
+    <header class="header dos-panel-header">
       <div class="header__left">
+        <span class="header__bracket">╔═</span>
         <span class="header__logo">MiGTRACKER PRO</span>
-        <span class="header__version">Web Player</span>
+        <span class="header__version">MS-DOS REPLAYER</span>
+        <span class="header__bracket">═╗</span>
       </div>
 
       <div class="header__right">
-        <button id="btn-open-songs" class="btn-load-song" title="Select a song from the library">
-          <span class="btn-load-icon">📂</span> LOAD SONG
+        <button id="btn-open-songs" class="dos-btn btn-load-song" title="Select a song from the library">
+          [ 📂 LOAD SONG ]
         </button>
-        <div id="drop-zone" role="button" tabindex="0" aria-label="Drop an MTP or SF2 file here or click to browse">
-          <span class="drop-icon">⊕ DROP .MTP / .SF2</span>
+        <div id="drop-zone" class="dos-drop-zone" role="button" tabindex="0" aria-label="Drop an MTP or SF2 file here or click to browse">
+          <span>┌─ DROP .MTP / .SF2 ─┐</span>
           <input type="file" id="file-input" accept=".mtp,.MTP,.sf2,.SF2" hidden />
         </div>
       </div>
     </header>
 
-    <!-- ── Song info ── -->
-    <section class="song-info" aria-label="Song information">
-      <div class="song-info__field">
-        <span class="song-info__key">SONG</span>
-        <span class="song-info__value song-info__value--empty" id="song-name">— no file loaded —</span>
-      </div>
-      <div class="song-info__field">
-        <span class="song-info__key">LASTPOS</span>
-        <span class="song-info__value" id="song-lastpos">—</span>
-      </div>
-      <div class="song-info__field">
-        <span class="song-info__key">LOOPPOS</span>
-        <span class="song-info__value" id="song-looppos">—</span>
-      </div>
-      <div class="song-info__field">
-        <span class="song-info__key">SPEED</span>
-        <span class="song-info__value" id="song-speed">—</span>
+    <!-- ── Song info panel ── -->
+    <section class="song-info dos-box" aria-label="Song information">
+      <div class="song-info__fields">
+        <div class="song-info__field">
+          <span class="song-info__key">SONG:</span>
+          <span class="song-info__value song-info__value--empty" id="song-name">— no file loaded —</span>
+        </div>
+        <div class="song-info__field">
+          <span class="song-info__key">LASTPOS:</span>
+          <span class="song-info__value" id="song-lastpos">—</span>
+        </div>
+        <div class="song-info__field">
+          <span class="song-info__key">LOOPPOS:</span>
+          <span class="song-info__value" id="song-looppos">—</span>
+        </div>
+        <div class="song-info__field">
+          <span class="song-info__key">SPEED:</span>
+          <span class="song-info__value" id="song-speed">—</span>
+        </div>
       </div>
     </section>
 
-    <!-- ── Transport ── -->
-    <section class="transport" aria-label="Transport controls">
+    <!-- ── Transport controls ── -->
+    <section class="transport dos-box" aria-label="Transport controls">
       <div class="transport__buttons">
-        <button id="btn-play"  class="transport__btn transport__btn--play"  title="Play">▶ PLAY</button>
-        <button id="btn-pause" class="transport__btn transport__btn--pause" title="Pause">⏸ PAUSE</button>
-        <button id="btn-stop"  class="transport__btn transport__btn--stop"  title="Stop">■ STOP</button>
+        <button id="btn-play"  class="transport__btn transport__btn--play dos-btn"  title="Play">[ ▶ PLAY ]</button>
+        <button id="btn-pause" class="transport__btn transport__btn--pause dos-btn" title="Pause">[ ⏸ PAUSE ]</button>
+        <button id="btn-stop"  class="transport__btn transport__btn--stop dos-btn"  title="Stop">[ ■ STOP ]</button>
       </div>
 
       <div class="transport__loop">
-        <input type="checkbox" id="btn-loop" class="transport__loop-checkbox" checked />
-        <span class="transport__loop-indicator"></span>
-        <label for="btn-loop" class="transport__loop-label">↺ LOOP</label>
+        <label class="dos-checkbox-label">
+          <input type="checkbox" id="btn-loop" class="transport__loop-checkbox" checked />
+          <span class="transport__loop-indicator dos-checkbox-box">[X]</span>
+          <span class="transport__loop-label">LOOP</span>
+        </label>
       </div>
 
-      <button id="btn-drum-mode" class="transport__btn" title="Toggle Percussion Mode (SoundFont samples vs Web Audio synth)">🥁 DRUMS: SF2</button>
-      <button id="btn-toggle-instr" class="transport__btn is-active" title="Toggle Channel Instrument Inspector Panel">🎹 INSTRUMENTS</button>
+      <button id="btn-drum-mode" class="transport__btn dos-btn" title="Toggle Percussion Mode">
+        [ 🥁 DRUMS: SF2 ]
+      </button>
+      <button id="btn-toggle-instr" class="transport__btn is-active dos-btn" title="Toggle Channel Instrument Inspector Panel">
+        [ 🎹 INSTRUMENTS ]
+      </button>
 
       <div class="transport__bank-select">
-        <label for="soundfont-select" class="transport__label">BANK</label>
-        <select id="soundfont-select" class="transport__select" title="Choose SoundFont Bank">
-          <option value="av_8mb" selected>👑 Avalon SoundFont (avalon_soundfont.sf2)</option>
-          <option value="awe32rom">💾 SoundBlaster AWE32 1MB ROM (1994)</option>
-          <option value="fatboy">💾 SoundBlaster AWE32 (FatBoy GM)</option>
-          <option value="sc55">🎹 Roland Sound Canvas SC-55 (90s Classic)</option>
-          <option value="gus">👾 Gravis UltraSound (GUS Tracker)</option>
-          <option value="timgm6mb">📦 TimGM6mb (DOSBox / Timidity)</option>
-          <option value="fluidr3">🔊 FluidR3 GM (AWE64 Gold SF2)</option>
-          <option value="musyngkite">🎼 MusyngKite (Studio HD)</option>
-          <option value="opl3">📻 SoundBlaster 16 / AdLib (OPL3 FM)</option>
-          <option value="tabla">🪘 Indian Tabla & Ethnic Percussion</option>
-          <option value="custom_sf2" id="opt-custom-sf2" style="display: none;">📂 Custom Loaded SF2</option>
-        </select>
+        <label for="soundfont-select" class="transport__label">BANK:</label>
+        <div class="dos-select-wrap">
+          <select id="soundfont-select" class="transport__select dos-select" title="Choose SoundFont Bank">
+            <option value="av_8mb" selected>👑 Avalon SoundFont (avalon_soundfont.sf2)</option>
+            <option value="awe32rom">💾 SoundBlaster AWE32 1MB ROM (1994)</option>
+            <option value="fatboy">💾 SoundBlaster AWE32 (FatBoy GM)</option>
+            <option value="sc55">🎹 Roland Sound Canvas SC-55 (90s Classic)</option>
+            <option value="gus">👾 Gravis UltraSound (GUS Tracker)</option>
+            <option value="timgm6mb">📦 TimGM6mb (DOSBox / Timidity)</option>
+            <option value="fluidr3">🔊 FluidR3 GM (AWE64 Gold SF2)</option>
+            <option value="musyngkite">🎼 MusyngKite (Studio HD)</option>
+            <option value="opl3">📻 SoundBlaster 16 / AdLib (OPL3 FM)</option>
+            <option value="tabla">🪘 Indian Tabla & Ethnic Percussion</option>
+            <option value="custom_sf2" id="opt-custom-sf2" style="display: none;">📂 Custom Loaded SF2</option>
+          </select>
+        </div>
       </div>
 
       <div class="transport__volume">
-        <span class="transport__label">VOL</span>
-        <input type="range" id="vol-slider" min="0" max="100" value="85" class="transport__slider" />
+        <span class="transport__label">VOL:</span>
+        <input type="range" id="vol-slider" min="0" max="100" value="85" class="transport__slider dos-slider" />
         <span class="song-info__value" id="vol-display">85%</span>
       </div>
     </section>
 
-    <!-- ── Position bar ── -->
-    <div class="position-bar" role="progressbar" aria-label="Song position" aria-valuemin="0" aria-valuemax="100">
+    <!-- ── Position progress bar ── -->
+    <div class="position-bar dos-progress" role="progressbar" aria-label="Song position" aria-valuemin="0" aria-valuemax="100">
       <div id="pos-fill" class="position-bar__fill"></div>
     </div>
 
     <!-- ── Pattern grid ── -->
-    <section aria-label="Pattern visualizer">
+    <section class="pattern-grid-section dos-box" aria-label="Pattern visualizer">
       <div id="pattern-grid" class="pattern-grid" role="grid" aria-label="Pattern data grid">
         <!-- Built dynamically by PlayerUI.js -->
       </div>
     </section>
 
     <!-- ── Live Channel Instruments Inspector ── -->
-    <section id="instr-inspector" class="instr-inspector" aria-label="Channel instrument assignments">
+    <section id="instr-inspector" class="instr-inspector dos-box" aria-label="Channel instrument assignments">
       <div class="instr-inspector__header">
         <div class="instr-inspector__title">
-          <span class="instr-inspector__icon">🎹</span>
-          <span>LIVE CHANNEL INSTRUMENT MAP</span>
+          <span>╠═ LIVE CHANNEL INSTRUMENT MAP ═╣</span>
         </div>
-        <span class="instr-inspector__hint">Updates live when mid-song program changes (I00–I19) execute</span>
+        <span class="instr-inspector__hint">Updates live on MIDI program changes (I00–I19)</span>
       </div>
       <div id="instr-inspector-grid" class="instr-inspector__grid">
         <!-- Populated dynamically by PlayerUI.js -->
@@ -136,61 +148,73 @@
     </section>
 
     <!-- ── Channel panel (mute + VU) ── -->
-    <section aria-label="Channel controls">
+    <section class="channel-panel-section dos-box" aria-label="Channel controls">
       <div id="channel-panel" class="channel-panel">
         <!-- Built dynamically by PlayerUI.js -->
       </div>
     </section>
 
     <!-- ── Status bar ── -->
-    <footer class="status-bar" aria-label="Playback status">
+    <footer class="status-bar dos-status-bar" aria-label="Playback status">
       <div class="status-bar__segment">
-        <span class="status-bar__item" id="status-pos">POS:—/—</span>
+        <span class="status-bar__item" id="status-pos">POS:001/---</span>
         <span class="status-bar__sep">│</span>
-        <span class="status-bar__item" id="status-step">STEP:—/16</span>
+        <span class="status-bar__item" id="status-step">STEP:00/15</span>
         <span class="status-bar__sep">│</span>
-        <span class="status-bar__item" id="status-speed">SPD:—</span>
+        <span class="status-bar__item" id="status-speed">SPD:--</span>
         <span class="status-bar__sep">│</span>
-        <span class="status-bar__item" id="status-track">PAT:—</span>
+        <span class="status-bar__item" id="status-track">PAT:--</span>
       </div>
       <div class="status-bar__segment">
-        <span class="status-bar__instrument" id="status-instr">INSTR:—</span>
+        <span class="status-bar__instrument" id="status-instr">INSTR:---</span>
+        <span class="status-bar__sep">│</span>
         <span class="status-bar__loop" id="status-loop">LOOP:ON</span>
       </div>
     </footer>
 
   </div><!-- /#app -->
 
-  <!-- ── Loading overlay ── -->
+  <!-- ── Loading overlay (DOS Dialog Box) ── -->
   <div id="loading-overlay" class="loading-overlay" role="status" aria-live="polite">
-    <div class="loading-overlay__box">
-      <div class="loading-overlay__spinner"></div>
-      <div id="loading-text" class="loading-overlay__text">INITIALISING…</div>
+    <div class="loading-overlay__box dos-dialog-box">
+      <div class="dos-dialog-title">╔═ READING DISKETTE / SOUNDFONT ═╗</div>
+      <div class="loading-overlay__spinner dos-spinner"></div>
+      <div id="loading-text" class="loading-overlay__text">INITIALISING AUDIO…</div>
       <div id="loading-subtext" class="loading-overlay__subtext">Preparing audio engine…</div>
       <div id="loading-progress-wrap" class="loading-overlay__progress-wrap">
-        <div class="loading-overlay__progress-bar">
+        <div class="loading-overlay__progress-bar dos-bar-frame">
           <div id="loading-progress-fill" class="loading-overlay__progress-fill" style="width: 0%;"></div>
         </div>
         <div id="loading-progress-pct" class="loading-overlay__progress-pct">0%</div>
       </div>
+      <div class="dos-dialog-footer-hint">Please wait • Accessing Web Audio Engine</div>
     </div>
   </div>
 
-  <!-- ── Song Selector Modal ── -->
+  <!-- ── Song Selector Modal (Norton Commander Style) ── -->
   <div id="songs-modal" class="modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-    <div class="modal-dialog">
-      <div class="modal-header">
-        <div class="modal-title" id="modal-title">📂 SELECT SONG TO LOAD</div>
-        <button id="btn-modal-close" class="modal-close-btn" aria-label="Close dialog">✕ ESC</button>
+    <div class="modal-dialog dos-modal-box">
+      <div class="modal-header dos-modal-header">
+        <div class="modal-title" id="modal-title">╔═ SELECT SONG TO LOAD (C:\MTP\SONGS\*.MTP) ═╗</div>
+        <button id="btn-modal-close" class="modal-close-btn dos-btn-close" aria-label="Close dialog">[ ✕ ESC ]</button>
       </div>
-      <div class="modal-search-wrap">
-        <input type="text" id="modal-search" class="modal-search-input" placeholder="🔍 Search songs by title or filename…" autocomplete="off" />
+      <div class="modal-search-wrap dos-search-wrap">
+        <span class="dos-prompt">C:\SONGS&gt;</span>
+        <input type="text" id="modal-search" class="modal-search-input dos-input" placeholder="Type song title or filename to filter…" autocomplete="off" />
       </div>
-      <div id="modal-songs-list" class="modal-songs-list" role="listbox" tabindex="0">
+      <div class="modal-songs-header dos-list-header">
+        <span class="col-idx">#</span>
+        <span class="col-name">SONG TITLE</span>
+        <span class="col-file">FILENAME</span>
+        <span class="col-meta">LASTPOS</span>
+        <span class="col-meta">SPD</span>
+      </div>
+      <div id="modal-songs-list" class="modal-songs-list dos-songs-list" role="listbox" tabindex="0">
         <!-- populated dynamically with 39 songs -->
       </div>
-      <div class="modal-footer">
-        <span class="modal-hint">Select a song to load & play immediately • Press <kbd>ESC</kbd> to exit</span>
+      <div class="modal-footer dos-modal-footer">
+        <span class="modal-hint">▲/▼: Navigate • <kbd>ENTER</kbd>: Load &amp; Play • <kbd>ESC</kbd>: Close</span>
+        <button id="btn-modal-load-first" class="dos-btn">[ LOAD SONG ]</button>
       </div>
     </div>
   </div>

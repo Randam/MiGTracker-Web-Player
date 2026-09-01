@@ -1,117 +1,47 @@
 /* ==========================================================================
-   MiGTRACKER Web Player — stylesheet
-   Dark terminal / phosphor-screen aesthetic
+   MiGTRACKER Web Player — MS-DOS Blue Screen Edition (Large Font)
+   Aesthetic: Authentic MS-DOS / Norton Commander solid blue (#0000aa)
+              with crisp white characters (#ffffff) and box borders.
    Font: IBM Plex Mono (Google Fonts)
-   Pure vanilla CSS — no frameworks
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   Google Fonts import
+   Google Fonts
    -------------------------------------------------------------------------- */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;0,700;1,400&display=swap');
 
 /* ==========================================================================
-   Design tokens
+   DOS Design Tokens (Blue & White Palette)
    ========================================================================== */
 :root {
-  /* --- Colour palette --- */
-  --color-bg:            #0a0a0a;
-  --color-bg-raised:     #101010;
-  --color-bg-overlay:    #0d0d0d;
-
-  --color-phosphor:      #39ff14;
-  --color-phosphor-dim:  #1a4a1a;
-  --color-phosphor-glow: rgba(57, 255, 20, 0.35);
-  --color-phosphor-mid:  #22aa0d;
-
-  --color-amber:         #ffb700;
-  --color-amber-dim:     #7a5600;
-  --color-amber-glow:    rgba(255, 183, 0, 0.30);
-
-  --color-text-primary:  #39ff14;
-  --color-text-secondary:#22aa0d;
-  --color-text-dim:      #1a4a1a;
-  --color-text-amber:    #ffb700;
-  --color-border:        #1e3a1e;
-  --color-border-accent: #39ff14;
-  --color-border-amber:  #ffb700;
-
-  --color-cell-active:   #39ff14;
-  --color-cell-hit:      #1a4a1a;
-  --color-cell-bg:       #080808;
-
-  --color-overlay-bg:    rgba(0, 0, 0, 0.80);
+  /* --- Authentic DOS Blue & White Theme --- */
+  --dos-blue:        #0000aa; /* Classic DOS / Norton Commander Blue */
+  --dos-white:       #ffffff; /* Bright White */
+  --dos-dim-blue:    #5555ff; /* Dim Blue for dots/inactive */
+  --dos-yellow:      #ffff55; /* Yellow accents */
+  --dos-red:         #ff5555; /* Red for Stop / Muted */
+  --dos-black:       #000000; /* Shadow / Inverted text */
 
   /* --- Typography --- */
   --font-mono: 'IBM Plex Mono', 'Courier New', Courier, monospace;
 
-  --font-size-xs:   0.65rem;
-  --font-size-sm:   0.75rem;
-  --font-size-base: 0.875rem;
-  --font-size-md:   1rem;
-  --font-size-lg:   1.25rem;
-  --font-size-xl:   1.5rem;
-  --font-size-2xl:  2rem;
+  /* --- Dimensions (Scaled for High Legibility) --- */
+  --header-height:     40px;
+  --status-bar-height: 28px;
+  --step-col-width:    36px;
+  --cell-width:        58px;
+  --cell-height:       24px;
+  --cell-gap:          1px;
+  --vu-bar-width:      58px;
+  --vu-bar-max-height: 24px;
+  --position-bar-h:    6px;
 
-  --font-weight-regular: 400;
-  --font-weight-medium:  500;
-  --font-weight-bold:    700;
-
-  /* --- Spacing scale (8-pt grid) --- */
-  --space-1:  4px;
-  --space-2:  8px;
-  --space-3:  12px;
-  --space-4:  16px;
-  --space-5:  20px;
-  --space-6:  24px;
-  --space-8:  32px;
-  --space-10: 40px;
-  --space-12: 48px;
-
-  /* --- Border radius --- */
-  --radius-none: 0;
-  --radius-sm:   2px;
-  --radius-md:   4px;
-
-  /* --- Borders --- */
-  --border-width:  1px;
-  --border-accent: var(--border-width) solid var(--color-phosphor);
-  --border-dim:    var(--border-width) solid var(--color-border);
-  --border-amber:  var(--border-width) solid var(--color-border-amber);
-  --border-dashed: var(--border-width) dashed var(--color-phosphor);
-
-  /* --- Transitions --- */
-  --transition-fast:   60ms ease;
-  --transition-normal: 120ms ease;
-  --transition-slow:   300ms ease;
-
-  /* --- Shadows / glows --- */
-  --glow-phosphor-sm:  0 0  4px var(--color-phosphor-glow);
-  --glow-phosphor-md:  0 0  8px var(--color-phosphor-glow),
-                       0 0 16px var(--color-phosphor-glow);
-  --glow-phosphor-lg:  0 0  8px var(--color-phosphor-glow),
-                       0 0 20px var(--color-phosphor-glow),
-                       0 0 40px rgba(57, 255, 20, 0.15);
-  --glow-amber-sm:     0 0  4px var(--color-amber-glow);
-  --glow-amber-md:     0 0  8px var(--color-amber-glow),
-                       0 0 16px var(--color-amber-glow);
-
-  /* --- Layout --- */
-  --header-height:      40px;
-  --status-bar-height:  24px;
-  --step-col-width:     32px;
-  --cell-width:         46px;
-  --cell-height:        20px;
-  --cell-gap:           1px;
-  --vu-bar-width:       46px;
-  --vu-bar-max-height:  24px;
-  --position-bar-h:     4px;
+  /* --- Box Shadows --- */
+  --shadow-dos: 8px 8px 0px #000000;
 }
 
-
 /* ==========================================================================
-   Reset / base
+   Reset & Base Styles
    ========================================================================== */
 *,
 *::before,
@@ -127,630 +57,447 @@ body {
   width:  100%;
 }
 
-body {
-  background-color: var(--color-bg);
-  color:            var(--color-text-primary);
+body.dos-body {
+  background-color: var(--dos-blue);
+  color:            var(--dos-white);
   font-family:      var(--font-mono);
-  font-size:        var(--font-size-base);
-  font-weight:      var(--font-weight-regular);
-  line-height:      1.5;
-  background-image: radial-gradient(
-    ellipse at center,
-    #0f0f0f 0%,
-    #0a0a0a 70%,
-    #000000 100%
-  );
-  -webkit-font-smoothing:  antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-size:        14px;
+  font-weight:      600;
+  line-height:      1.3;
+  overflow:         hidden;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: none;
+  text-rendering:   geometricPrecision;
+  user-select:      none;
 }
 
 ::selection {
-  background-color: var(--color-phosphor-dim);
-  color:            var(--color-phosphor);
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
 }
 
-::-webkit-scrollbar        { width: 8px; height: 8px; }
-::-webkit-scrollbar-track  { background: var(--color-bg); }
-::-webkit-scrollbar-thumb  { background: var(--color-phosphor-dim); border-radius: 0; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-phosphor-mid); }
-
-
-/* ==========================================================================
-   Keyframe animations
-   ========================================================================== */
-
-@keyframes blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
+/* Retro DOS Scrollbars */
+::-webkit-scrollbar {
+  width:  12px;
+  height: 12px;
 }
-
-@keyframes pulse-glow {
-  0%   { box-shadow: var(--glow-phosphor-sm); }
-  50%  { box-shadow: var(--glow-phosphor-lg); }
-  100% { box-shadow: var(--glow-phosphor-sm); }
+::-webkit-scrollbar-track {
+  background: var(--dos-blue);
+  border: 1px solid var(--dos-white);
 }
-
-@keyframes pulse-glow-amber {
-  0%   { box-shadow: var(--glow-amber-sm); }
-  50%  { box-shadow: var(--glow-amber-md); }
-  100% { box-shadow: var(--glow-amber-sm); }
+::-webkit-scrollbar-thumb {
+  background: var(--dos-white);
 }
-
-@keyframes vu-pulse {
-  0%   { transform: scaleY(0.1); opacity: 0.4; }
-  40%  { transform: scaleY(1.0); opacity: 1.0; }
-  70%  { transform: scaleY(0.6); opacity: 0.8; }
-  100% { transform: scaleY(0.1); opacity: 0.4; }
-}
-
-@keyframes cell-flash {
-  0%   { background-color: #ffffff;
-         box-shadow: 0 0 8px #fff, 0 0 16px var(--color-phosphor); }
-  15%  { background-color: var(--color-phosphor);
-         box-shadow: var(--glow-phosphor-md); }
-  100% { background-color: var(--color-phosphor-dim);
-         box-shadow: none; }
+::-webkit-scrollbar-thumb:hover {
+  background: var(--dos-yellow);
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-@keyframes scanline-drift {
-  0%   { background-position: 0 0; }
-  100% { background-position: 0 4px; }
+/* ==========================================================================
+   1. #app — Main Fullscreen Application Container
+   ========================================================================== */
+.dos-app {
+  display:          flex;
+  flex-direction:   column;
+  height:           100vh;
+  max-height:       100vh;
+  width:            100%;
+  overflow:         hidden;
+  position:         relative;
+  background-color: var(--dos-blue);
+  border:           3px double var(--dos-white);
 }
 
-
-/* ==========================================================================
-   1. #app — Application shell
-   ========================================================================== */
-#app {
-  display:        flex;
-  flex-direction: column;
-  height:         100vh;
-  max-height:     100vh;
-  width:          100%;
-  overflow:       hidden;
-  position:       relative;
+/* Generic DOS Box Framing */
+.dos-box {
+  background-color: var(--dos-blue);
+  border:           1px solid var(--dos-white);
+  position:         relative;
+  flex-shrink:      0;
 }
 
-
 /* ==========================================================================
-   2. .header — Top navigation bar
+   2. .header — Top Header Bar
    ========================================================================== */
-.header {
+.header.dos-panel-header {
   display:          flex;
   align-items:      center;
   justify-content:  space-between;
   height:           var(--header-height);
-  padding:          0 var(--space-4);
-  background-color: var(--color-bg-raised);
-  border-bottom:    var(--border-accent);
-  box-shadow:       0 1px 0 var(--color-phosphor-dim),
-                    0 2px 8px rgba(57, 255, 20, 0.10);
+  padding:          0 14px;
+  background-color: var(--dos-blue);
+  color:            var(--dos-white);
+  border-bottom:    1px solid var(--dos-white);
   flex-shrink:      0;
   z-index:          10;
-  gap:              var(--space-4);
+  gap:              14px;
 }
 
 .header__left {
-  display:        flex;
-  flex-direction: row;
-  align-items:    baseline;
-  gap:            var(--space-3);
+  display:     flex;
+  align-items: center;
+  gap:         8px;
+}
+
+.header__bracket {
+  color:       var(--dos-white);
+  font-size:   18px;
+  font-weight: 700;
 }
 
 .header__logo {
-  font-size:      var(--font-size-md);
-  font-weight:    var(--font-weight-bold);
-  letter-spacing: 0.12em;
-  color:          var(--color-phosphor);
-  text-shadow:    var(--glow-phosphor-md);
-  white-space:    nowrap;
-  user-select:    none;
-}
-
-.header__logo::after {
-  content:     '_';
-  display:     inline-block;
-  margin-left: 2px;
-  color:       var(--color-amber);
-  animation:   blink 1s step-end infinite;
+  font-size:      18px;
+  font-weight:    700;
+  color:          var(--dos-white);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .header__version {
-  font-size:      var(--font-size-xs);
-  color:          var(--color-text-dim);
-  letter-spacing: 0.06em;
+  font-size:      13px;
+  color:          var(--dos-white);
+  opacity:        0.85;
 }
 
 .header__right {
   display:     flex;
   align-items: center;
-  gap:         var(--space-3);
+  gap:         10px;
   flex-shrink: 0;
 }
 
-.btn-load-song {
-  display:          flex;
-  align-items:      center;
-  gap:              var(--space-2);
-  height:           26px;
-  padding:          2px var(--space-3);
-  font-family:      var(--font-mono);
-  font-size:        var(--font-size-xs);
-  font-weight:      var(--font-weight-bold);
-  color:            var(--color-bg);
-  background-color: var(--color-amber);
-  border:           1px solid var(--color-amber);
-  border-radius:    var(--radius-sm);
-  cursor:           pointer;
-  letter-spacing:   0.05em;
-  text-transform:   uppercase;
-  user-select:      none;
-  transition:       background-color var(--transition-fast),
-                    color            var(--transition-fast),
-                    box-shadow       var(--transition-fast),
-                    transform        var(--transition-fast);
-  box-shadow:       0 0 8px rgba(255, 183, 0, 0.3);
-}
-
-.btn-load-song:hover {
-  background-color: #ffca28;
-  box-shadow:       0 0 14px rgba(255, 183, 0, 0.6);
-  transform:        translateY(-1px);
-}
-
-.btn-load-song:active {
-  transform:        translateY(1px);
-}
-
-.btn-load-icon {
-  font-size: 13px;
-  line-height: 1;
-}
-
-
-/* ==========================================================================
-   3. #drop-zone — File drop area
-   ========================================================================== */
-#drop-zone {
-  display:          flex;
+/* DOS Buttons */
+.dos-btn {
+  display:          inline-flex;
   align-items:      center;
   justify-content:  center;
-  gap:              var(--space-2);
-  padding:          2px var(--space-3);
-  min-width:        180px;
-  height:           26px;
-  border:           var(--border-dashed);
-  border-radius:    var(--radius-sm);
-  background-color: transparent;
-  color:            var(--color-text-secondary);
+  gap:              4px;
+  background-color: var(--dos-blue);
+  color:            var(--dos-white);
+  border:           1px solid var(--dos-white);
   font-family:      var(--font-mono);
-  font-size:        var(--font-size-xs);
-  letter-spacing:   0.05em;
+  font-size:        13px;
+  font-weight:      700;
+  padding:          3px 10px;
+  height:           28px;
   cursor:           pointer;
-  transition:       border-color     var(--transition-fast),
-                    background-color var(--transition-fast),
-                    color            var(--transition-fast),
-                    box-shadow       var(--transition-fast);
-  position:         relative;
-  user-select:      none;
-}
-
-#drop-zone:hover,
-#drop-zone:focus-within {
-  border-color:     var(--color-phosphor);
-  background-color: rgba(57, 255, 20, 0.05);
-  color:            var(--color-phosphor);
-  box-shadow:       var(--glow-phosphor-sm);
   outline:          none;
+  text-transform:   uppercase;
+  white-space:      nowrap;
 }
 
-#drop-zone.dragover,
-#drop-zone[data-dragover="true"] {
-  border-color:     var(--color-amber);
-  background-color: rgba(255, 183, 0, 0.08);
-  color:            var(--color-amber);
-  box-shadow:       var(--glow-amber-md);
-  animation:        pulse-glow-amber 0.8s ease infinite;
+.dos-btn:hover,
+.dos-btn:focus-visible {
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
+}
+
+.dos-btn:active {
+  background-color: var(--dos-yellow);
+  color:            var(--dos-blue);
+  border-color:     var(--dos-yellow);
+}
+
+.btn-load-song {
+  height: 28px;
+}
+
+/* Drop Zone */
+.dos-drop-zone {
+  display:          inline-flex;
+  align-items:      center;
+  justify-content:  center;
+  height:           28px;
+  padding:          0 10px;
+  border:           1px dashed var(--dos-white);
+  background-color: var(--dos-blue);
+  color:            var(--dos-white);
+  font-size:        12px;
+  font-weight:      700;
+  cursor:           pointer;
+  position:         relative;
+}
+
+.dos-drop-zone:hover,
+.dos-drop-zone.dragover {
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
 }
 
 #file-input {
-  position:  absolute;
-  inset:     0;
-  width:     100%;
-  height:    100%;
-  opacity:   0;
-  cursor:    pointer;
-  font-size: 0;
+  position: absolute;
+  inset:    0;
+  opacity:  0;
+  cursor:   pointer;
 }
 
-
 /* ==========================================================================
-   4. .song-info — Song metadata display
+   3. .song-info — Song Metadata Bar
    ========================================================================== */
-.song-info {
+.song-info.dos-box {
   display:          flex;
-  flex-wrap:        nowrap;
   align-items:      center;
-  gap:              var(--space-4);
-  padding:          2px var(--space-4);
-  background-color: var(--color-bg-raised);
-  border-bottom:    var(--border-dim);
-  font-size:        var(--font-size-xs);
-  flex-shrink:      0;
-  height:           26px;
-  overflow:         hidden;
+  height:           32px;
+  padding:          0 14px;
+  background-color: var(--dos-blue);
+  border-left:      none;
+  border-right:     none;
+  border-top:       none;
+  border-bottom:    1px solid var(--dos-white);
+}
+
+.song-info__fields {
+  display:     flex;
+  align-items: center;
+  gap:         28px;
+  width:       100%;
 }
 
 .song-info__field {
   display:     flex;
-  align-items: baseline;
-  gap:         var(--space-1);
+  align-items: center;
+  gap:         6px;
   white-space: nowrap;
+  font-size:   13px;
 }
 
 .song-info__key {
-  color:          var(--color-text-dim);
-  font-weight:    var(--font-weight-medium);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.song-info__key::after {
-  content: ':';
-  color:   var(--color-phosphor-mid);
+  color:       var(--dos-white);
+  font-weight: 700;
 }
 
 .song-info__value {
-  color:       var(--color-phosphor);
-  font-weight: var(--font-weight-bold);
-  text-shadow: var(--glow-phosphor-sm);
-}
-
-.song-info__value--amber {
-  color:       var(--color-amber);
-  text-shadow: var(--glow-amber-sm);
+  color:       var(--dos-white);
+  font-weight: 700;
 }
 
 .song-info__value--empty {
-  color:   var(--color-text-dim);
-  opacity: 0.5;
+  opacity: 0.6;
 }
 
-
 /* ==========================================================================
-   5. .transport — Playback controls
+   4. .transport — Playback Controls
    ========================================================================== */
-.transport {
+.transport.dos-box {
   display:          flex;
   flex-wrap:        nowrap;
   align-items:      center;
   justify-content:  space-between;
-  gap:              var(--space-3);
-  padding:          2px var(--space-4);
-  background-color: var(--color-bg-raised);
-  border-bottom:    var(--border-dim);
-  flex-shrink:      0;
-  height:           32px;
+  gap:              10px;
+  padding:          4px 14px;
+  background-color: var(--dos-blue);
+  border-left:      none;
+  border-right:     none;
+  border-top:       none;
+  border-bottom:    1px solid var(--dos-white);
+  height:           38px;
 }
 
 .transport__buttons {
   display: flex;
-  gap:     var(--space-2);
-}
-
-.transport__btn {
-  display:          inline-flex;
-  align-items:      center;
-  justify-content:  center;
-  gap:              var(--space-1);
-  padding:          0 var(--space-3);
-  height:           24px;
-  min-width:        54px;
-  background-color: transparent;
-  color:            var(--color-phosphor);
-  font-family:      var(--font-mono);
-  font-size:        var(--font-size-xs);
-  font-weight:      var(--font-weight-bold);
-  letter-spacing:   0.08em;
-  text-transform:   uppercase;
-  border:           var(--border-accent);
-  border-radius:    var(--radius-sm);
-  cursor:           pointer;
-  user-select:      none;
-  transition:       background-color var(--transition-fast),
-                    color            var(--transition-fast),
-                    box-shadow       var(--transition-fast),
-                    border-color     var(--transition-fast);
-  outline:          none;
-  white-space:      nowrap;
-}
-
-.transport__btn:hover {
-  background-color: var(--color-phosphor);
-  color:            #000;
-  box-shadow:       var(--glow-phosphor-md);
-}
-
-.transport__btn:active {
-  background-color: var(--color-phosphor-mid);
-  transform:        translateY(1px);
-}
-
-.transport__btn:focus-visible {
-  outline:        2px solid var(--color-amber);
-  outline-offset: 1px;
-}
-
-.transport__btn--stop {
-  border-color: var(--color-amber);
-  color:        var(--color-amber);
-}
-
-.transport__btn--stop:hover {
-  background-color: var(--color-amber);
-  color:            #000;
-  box-shadow:       var(--glow-amber-md);
+  gap:     8px;
 }
 
 .transport__btn--play.is-playing {
-  background-color: var(--color-phosphor);
-  color:            #000;
-  animation:        pulse-glow 1.4s ease-in-out infinite;
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
 }
 
 .transport__btn--pause.is-paused {
-  background-color: var(--color-phosphor-dim);
-  color:            var(--color-phosphor);
-  box-shadow:       var(--glow-phosphor-sm);
+  background-color: var(--dos-yellow);
+  color:            var(--dos-blue);
+  border-color:     var(--dos-yellow);
 }
 
-/* Volume control */
-.transport__volume {
+.transport__btn--stop:hover {
+  background-color: var(--dos-red);
+  color:            var(--dos-white);
+  border-color:     var(--dos-red);
+}
+
+/* Checkbox */
+.dos-checkbox-label {
   display:     flex;
   align-items: center;
-  gap:         var(--space-2);
-  flex-shrink: 0;
-}
-
-.transport__label {
-  font-size:      var(--font-size-xs);
-  color:          var(--color-text-dim);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space:    nowrap;
-}
-
-.transport__slider {
-  -webkit-appearance: none;
-  appearance:         none;
-  width:              96px;
-  height:             4px;
-  background:         var(--color-phosphor-dim);
-  border-radius:      0;
-  outline:            none;
-  cursor:             pointer;
-  transition:         background var(--transition-fast);
-}
-
-.transport__slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance:         none;
-  width:              12px;
-  height:             18px;
-  background:         var(--color-phosphor);
-  border-radius:      0;
-  box-shadow:         var(--glow-phosphor-sm);
-  cursor:             pointer;
-  transition:         box-shadow var(--transition-fast);
-}
-
-.transport__slider::-moz-range-thumb {
-  width:         12px;
-  height:        18px;
-  background:    var(--color-phosphor);
-  border:        none;
-  border-radius: 0;
-  box-shadow:    var(--glow-phosphor-sm);
-  cursor:        pointer;
-}
-
-.transport__slider:hover::-webkit-slider-thumb { box-shadow: var(--glow-phosphor-md); }
-.transport__slider:hover::-moz-range-thumb     { box-shadow: var(--glow-phosphor-md); }
-
-/* Loop toggle */
-.transport__loop {
-  display:     flex;
-  align-items: center;
-  gap:         var(--space-1);
+  gap:         6px;
   cursor:      pointer;
-  user-select: none;
-  transition:  color var(--transition-fast);
+  font-size:   13px;
+  color:       var(--dos-white);
+  font-weight: 700;
 }
 
 .transport__loop-checkbox {
   position: absolute;
   opacity:  0;
-  width:    0;
-  height:   0;
+  pointer-events: none;
 }
 
-.transport__loop-indicator {
-  display:          inline-flex;
-  align-items:      center;
-  justify-content:  center;
-  width:            14px;
-  height:           14px;
-  border:           var(--border-accent);
-  border-radius:    0;
-  background-color: transparent;
-  transition:       background-color var(--transition-fast),
-                    box-shadow       var(--transition-fast);
-  flex-shrink:      0;
+.dos-checkbox-box {
+  font-size: 0;
 }
 
-.transport__loop-checkbox:checked + .transport__loop-indicator {
-  background-color: var(--color-phosphor);
-  box-shadow:       var(--glow-phosphor-sm);
+.transport__loop-checkbox:checked + .dos-checkbox-box::before {
+  content: '[X]';
+  font-size: 13px;
+  color: var(--dos-white);
 }
 
-.transport__loop-checkbox:checked + .transport__loop-indicator::after {
-  content:     'x';
-  font-size:   9px;
-  color:       #000;
-  font-weight: var(--font-weight-bold);
+.transport__loop-checkbox:not(:checked) + .dos-checkbox-box::before {
+  content: '[ ]';
+  font-size: 13px;
+  color: var(--dos-dim-blue);
 }
 
-.transport__loop-label {
-  font-size:      var(--font-size-xs);
-  color:          var(--color-text-secondary);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.transport__loop:has(.transport__loop-checkbox:checked) .transport__loop-label {
-  color:     var(--color-amber);
-  animation: pulse-glow-amber 1.4s ease-in-out infinite;
-}
-
-/* SoundFont Bank selector */
+/* SoundFont Select */
 .transport__bank-select {
   display:     flex;
   align-items: center;
-  gap:         var(--space-1);
+  gap:         6px;
 }
 
-.transport__select {
-  height:           24px;
-  background-color: #050505;
-  color:            var(--color-phosphor);
-  border:           var(--border-accent);
-  border-radius:    var(--radius-sm);
+.transport__label {
+  color:       var(--dos-white);
+  font-size:   13px;
+  font-weight: 700;
+}
+
+.dos-select {
+  height:           28px;
+  background-color: var(--dos-blue);
+  color:            var(--dos-white);
+  border:           1px solid var(--dos-white);
   font-family:      var(--font-mono);
-  font-size:        var(--font-size-xs);
+  font-size:        13px;
+  font-weight:      700;
   padding:          0 6px;
   outline:          none;
   cursor:           pointer;
-  letter-spacing:   0.04em;
-  transition:       border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.transport__select:hover,
-.transport__select:focus {
-  border-color: var(--color-phosphor);
-  box-shadow:   var(--glow-phosphor-sm);
+.dos-select:hover,
+.dos-select:focus {
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
 }
 
-.transport__select option {
-  background-color: #101010;
-  color:            var(--color-phosphor);
+.dos-select option {
+  background-color: var(--dos-blue);
+  color:            var(--dos-white);
 }
 
+/* Volume Slider */
+.transport__volume {
+  display:     flex;
+  align-items: center;
+  gap:         8px;
+  flex-shrink: 0;
+}
+
+.dos-slider {
+  -webkit-appearance: none;
+  appearance:         none;
+  width:              90px;
+  height:             8px;
+  background:         var(--dos-blue);
+  border:             1px solid var(--dos-white);
+  outline:            none;
+  cursor:             pointer;
+}
+
+.dos-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance:         none;
+  width:              12px;
+  height:             18px;
+  background:         var(--dos-white);
+  border:             1px solid var(--dos-blue);
+  cursor:             pointer;
+}
+
+.dos-slider::-moz-range-thumb {
+  width:      12px;
+  height:     18px;
+  background: var(--dos-white);
+  border:     1px solid var(--dos-blue);
+  cursor:     pointer;
+}
 
 /* ==========================================================================
-   6. .position-bar — Playback progress bar
+   5. .position-bar — Progress Bar
    ========================================================================== */
-.position-bar {
-  width:       100%;
-  height:      var(--position-bar-h);
-  background:  var(--color-phosphor-dim);
-  position:    relative;
-  flex-shrink: 0;
-  overflow:    hidden;
-  cursor:      pointer;
+.position-bar.dos-progress {
+  width:            100%;
+  height:           var(--position-bar-h);
+  background-color: var(--dos-blue);
+  border-bottom:    1px solid var(--dos-white);
+  position:         relative;
+  flex-shrink:      0;
+  overflow:         hidden;
 }
 
 .position-bar__fill {
   height:           100%;
   width:            0%;
-  background-color: var(--color-phosphor);
-  box-shadow:       2px 0 8px var(--color-phosphor-glow);
-  transition:       width 80ms linear;
-  position:         relative;
+  background-color: var(--dos-white);
 }
-
-.position-bar__fill::after {
-  content:    '';
-  position:   absolute;
-  top:        0;
-  right:      -4px;
-  width:      8px;
-  height:     100%;
-  background: linear-gradient(to right, var(--color-phosphor), transparent);
-  pointer-events: none;
-}
-
-.position-bar:hover .position-bar__fill {
-  background-color: var(--color-amber);
-  box-shadow:       2px 0 8px var(--color-amber-glow);
-}
-
 
 /* ==========================================================================
-   7. .pattern-grid — Main tracker visualization (Vertical Layout)
+   6. .pattern-grid — Pattern Visualizer (Classic Tracker)
    ========================================================================== */
+.pattern-grid-section.dos-box {
+  flex:             1 1 auto;
+  min-height:       0;
+  background-color: var(--dos-blue);
+  border-left:      none;
+  border-right:     none;
+  border-top:       none;
+  border-bottom:    1px solid var(--dos-white);
+  display:          flex;
+  flex-direction:   column;
+  overflow:         hidden;
+}
+
 .pattern-grid {
-  position:         relative;
   flex:             1 1 auto;
   min-height:       0;
   overflow-x:       auto;
   overflow-y:       auto;
-  padding:          4px var(--space-4);
-  background-color: var(--color-bg);
+  padding:          4px 6px;
+  background-color: var(--dos-blue);
   display:          flex;
   justify-content:  center;
   align-items:      flex-start;
 }
 
-/* Scanline overlay */
-.pattern-grid::after {
-  content:         '';
-  position:        absolute;
-  inset:           0;
-  pointer-events:  none;
-  z-index:         2;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent 0px,
-    transparent 2px,
-    rgba(0, 0, 0, 0.30) 2px,
-    rgba(0, 0, 0, 0.30) 3px
-  );
-  animation: scanline-drift 8s linear infinite;
-}
-
-/* Vertical Grid — 18 columns (STEP + 17 channels) × 17 rows (header + 16 steps) */
+/* Vertical Grid: 18 columns × 17 rows */
 .pattern-grid__inner {
   display:               grid;
   grid-template-columns: var(--step-col-width) repeat(17, var(--cell-width));
   grid-auto-rows:        var(--cell-height);
   gap:                   var(--cell-gap);
   width:                 fit-content;
-  position:              relative;
-  z-index:               1;
-  background-color:      #0b180b;
-  border:                1px solid #142814;
+  background-color:      var(--dos-white); /* grid border lines */
+  border:                1px solid var(--dos-white);
 }
 
-/* Column Channel Header */
+/* Column Header Row */
 .ch-label {
   display:          flex;
   align-items:      center;
   justify-content:  center;
   height:           var(--cell-height);
-  font-size:        10px;
-  font-weight:      var(--font-weight-bold);
-  color:            var(--color-phosphor);
-  background-color: #0c200c;
-  letter-spacing:   0.04em;
+  font-size:        13px;
+  font-weight:      700;
+  color:            var(--dos-white);
+  background-color: var(--dos-blue);
+  letter-spacing:   0.02em;
   text-transform:   uppercase;
   white-space:      nowrap;
   user-select:      none;
-  border-bottom:    1px solid var(--color-phosphor-mid);
-  transition:       background-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
+  border-bottom:    1px solid var(--dos-white);
 }
 
 .ch-label:not(.ch-label--step) {
@@ -758,272 +505,122 @@ body {
 }
 
 .ch-label:not(.ch-label--step):hover {
-  background-color: rgba(57, 255, 20, 0.25);
-  color:            #ffffff;
-  box-shadow:       inset 0 0 4px rgba(57, 255, 20, 0.4);
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
 }
 
 .ch-label.is-muted {
-  color:            #ff4444 !important;
-  background-color: #1a0808 !important;
-  border-bottom:    1px solid #5a1818 !important;
+  color:            var(--dos-white) !important;
+  background-color: var(--dos-red) !important;
   text-decoration:  line-through;
-  opacity:          0.65;
-}
-
-.ch-label.is-muted:hover {
-  background-color: #2a0f0f !important;
-  color:            #ff8888 !important;
-  opacity:          0.9;
 }
 
 .ch-label--step {
-  color:            var(--color-text-dim);
-  background-color: #061006;
+  color:            var(--dos-white);
+  background-color: var(--dos-blue);
   cursor:           default !important;
 }
 
 .ch-label--drum {
-  color:               var(--color-amber);
-  border-bottom-color: var(--color-amber-dim);
+  color: var(--dos-yellow);
 }
 
-.ch-label--drum:hover {
-  background-color: rgba(255, 183, 0, 0.25) !important;
-  color:            #ffffff !important;
-}
-
-/* Dim entire column when muted */
+/* Muted Column Dimming */
 .grid-cell.is-muted-col {
-  opacity:          0.25 !important;
-  color:            var(--color-dim) !important;
+  opacity: 0.25 !important;
 }
 
-/* Step number in vertical row */
+/* Step Label in Row */
 .step-label {
   display:          flex;
   align-items:      center;
   justify-content:  center;
   width:            var(--step-col-width);
   height:           var(--cell-height);
-  font-size:        10px;
-  color:            var(--color-text-dim);
-  background-color: #061006;
+  font-size:        13px;
+  font-weight:      700;
+  color:            var(--dos-white);
+  background-color: var(--dos-blue);
   user-select:      none;
-  transition:       background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .step-label.active-step {
-  background-color: var(--color-phosphor);
-  color:            #000;
-  font-weight:      bold;
-  box-shadow:       var(--glow-phosphor-sm);
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
 }
 
-/* Grid cell */
+/* Grid Cell */
 .grid-cell {
   display:          flex;
   align-items:      center;
   justify-content:  center;
   width:            var(--cell-width);
   height:           var(--cell-height);
-  background-color: #080808;
-  font-size:        10px;
+  background-color: var(--dos-blue);
+  font-size:        13px;
   font-family:      var(--font-mono);
-  color:            #183a18;
+  font-weight:      700;
+  color:            var(--dos-dim-blue); /* dim dots */
   cursor:           default;
   user-select:      none;
   position:         relative;
   overflow:         hidden;
-  transition:       background-color var(--transition-fast),
-                    color            var(--transition-fast);
 }
 
 .grid-cell.has-note {
-  background-color: rgba(57, 255, 20, 0.08);
-  color:            var(--color-phosphor);
+  color:       var(--dos-white);
+  font-weight: 700;
 }
 
 .grid-cell.has-cmd {
-  background-color: rgba(34, 170, 13, 0.05);
-  color:            var(--color-text-secondary);
+  color:       var(--dos-yellow);
+  font-weight: 700;
 }
 
 .grid-cell.drum.has-note {
-  background-color: rgba(255, 183, 0, 0.08);
-  color:            var(--color-amber);
+  color:       var(--dos-yellow);
+  font-weight: 700;
 }
 
-/* Active Step Row (current step highlight running top to bottom) */
+/* Active Step Row (Norton Commander Cursor Highlight) */
 .grid-cell.active-step-row {
-  background-color: rgba(57, 255, 20, 0.16);
-  color:            var(--color-phosphor);
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
+  font-weight:      700;
 }
 
 .grid-cell.active-step-row.has-note {
-  background-color: var(--color-phosphor);
-  color:            #000;
-  font-weight:      bold;
-  box-shadow:       var(--glow-phosphor-sm);
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
+  font-weight:      700;
 }
 
 .grid-cell.active-step-row.has-cmd {
-  background-color: var(--color-phosphor-mid);
-  color:            #000;
-  font-weight:      bold;
+  background-color: var(--dos-yellow);
+  color:            var(--dos-blue);
+  font-weight:      700;
 }
 
 .grid-cell.active-step-row.drum.has-note {
-  background-color: var(--color-amber);
-  color:            #000;
-  font-weight:      bold;
-  box-shadow:       var(--glow-amber-md);
+  background-color: var(--dos-yellow);
+  color:            var(--dos-blue);
+  font-weight:      700;
 }
-
 
 /* ==========================================================================
-   8. .channel-panel — Mute buttons + VU meters
+   7. .instr-inspector — Live Channel Instrument Inspector
    ========================================================================== */
-.channel-panel {
-  display:          flex;
-  justify-content:  center;
-  align-items:      flex-end;
-  gap:              var(--cell-gap);
-  padding:          4px var(--space-4);
-  padding-left:     calc(var(--space-4) + var(--step-col-width) + var(--cell-gap));
-  background-color: var(--color-bg-raised);
-  border-top:       var(--border-dim);
-  flex-shrink:      0;
-  overflow-x:       auto;
-}
-
-.channel-strip {
-  display:        flex;
-  flex-direction: column;
-  align-items:    center;
-  gap:            2px;
-  width:          var(--vu-bar-width);
-}
-
-.mute-btn {
-  display:          inline-flex;
-  align-items:      center;
-  justify-content:  center;
-  width:            var(--vu-bar-width);
-  height:           18px;
-  background-color: transparent;
-  color:            var(--color-text-secondary);
-  font-family:      var(--font-mono);
-  font-size:        9px;
-  font-weight:      var(--font-weight-medium);
-  letter-spacing:   0.02em;
-  text-transform:   uppercase;
-  border:           var(--border-dim);
-  border-radius:    var(--radius-sm);
-  cursor:           pointer;
-  user-select:      none;
-  transition:       background-color var(--transition-fast),
-                    color            var(--transition-fast),
-                    border-color     var(--transition-fast);
-  outline:          none;
-}
-
-.mute-btn:hover {
-  border-color: var(--color-phosphor);
-  color:        var(--color-phosphor);
-  box-shadow:   var(--glow-phosphor-sm);
-}
-
-.mute-btn.is-muted {
-  background-color: #1a0000;
-  border-color:     #550000;
-  color:            #550000;
-  text-decoration:  line-through;
-}
-
-/* VU meter */
-.vu-meter {
-  width:            var(--vu-bar-width);
-  height:           var(--vu-bar-max-height);
-  background-color: #050505;
-  border:           1px solid #142814;
-  position:         relative;
-  overflow:         hidden;
-  display:          flex;
-  flex-direction:   column;
-  justify-content:  flex-end;
-}
-
-.vu-meter__bar {
-  width:         100%;
-  height:        0%;
-  background:    linear-gradient(
-    to top,
-    var(--color-phosphor) 0%,
-    var(--color-phosphor-mid) 60%,
-    var(--color-amber) 90%,
-    #ff4400 100%
-  );
-  box-shadow:      0 -1px 4px var(--color-phosphor-glow);
-  transform-origin: bottom center;
-  transition:      height 40ms ease-out;
-}
-
-/* VU segment lines overlay */
-.vu-meter::before {
-  content:          '';
-  position:         absolute;
-  inset:            0;
-  z-index:          1;
-  pointer-events:   none;
-  background-image: repeating-linear-gradient(
-    to top,
-    transparent 0px,
-    transparent 2px,
-    rgba(0, 0, 0, 0.40) 2px,
-    rgba(0, 0, 0, 0.40) 3px
-  );
-}
-
-/* Channel Instrument Label on channel strips */
-.channel-instr {
-  font-family:      var(--font-mono);
-  font-size:        8px;
-  line-height:      1.1;
-  color:            var(--color-amber);
-  background-color: rgba(0, 0, 0, 0.7);
-  border:           1px solid rgba(255, 183, 0, 0.25);
-  border-radius:    var(--radius-sm);
-  padding:          2px 1px;
-  width:            var(--vu-bar-width);
-  text-align:       center;
-  white-space:      nowrap;
-  overflow:         hidden;
-  text-overflow:    ellipsis;
-  margin-top:       2px;
-  cursor:           default;
-  user-select:      none;
-  transition:       background-color 0.4s ease, border-color 0.4s ease, color 0.4s ease, box-shadow 0.4s ease;
-}
-
-.channel-instr.is-changed {
-  background-color: var(--color-amber);
-  color:            #000000;
-  border-color:     #ffffff;
-  box-shadow:       var(--glow-amber-md);
-  font-weight:      var(--font-weight-bold);
-}
-
-/* Live Channel Instrument Inspector Panel */
-.instr-inspector {
-  background-color: var(--color-bg-raised);
-  border-top:       var(--border-dim);
-  border-bottom:    var(--border-dim);
-  padding:          4px var(--space-4);
+.instr-inspector.dos-box {
+  background-color: var(--dos-blue);
+  border-left:      none;
+  border-right:     none;
+  border-top:       none;
+  border-bottom:    1px solid var(--dos-white);
+  padding:          3px 14px;
   flex-shrink:      0;
   display:          flex;
   flex-direction:   column;
-  gap:              4px;
+  gap:              3px;
 }
 
 .instr-inspector.is-hidden {
@@ -1034,384 +631,230 @@ body {
   display:         flex;
   align-items:     center;
   justify-content: space-between;
-  gap:             var(--space-2);
 }
 
 .instr-inspector__title {
-  font-size:      var(--font-size-xs);
-  font-weight:    var(--font-weight-bold);
-  color:          var(--color-amber);
-  letter-spacing: 0.08em;
-  display:        flex;
-  align-items:    center;
-  gap:            4px;
-  text-shadow:    var(--glow-amber-sm);
+  font-size:   13px;
+  font-weight: 700;
+  color:       var(--dos-white);
 }
 
 .instr-inspector__hint {
-  font-size:      9px;
-  color:          var(--color-text-dim);
-  letter-spacing: 0.04em;
+  font-size:  11px;
+  color:      var(--dos-white);
+  opacity:    0.85;
 }
 
 .instr-inspector__grid {
   display:               grid;
-  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
-  gap:                   4px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap:                   3px;
   max-height:            80px;
   overflow-y:            auto;
-  padding-right:         2px;
 }
 
 .instr-cell {
   display:          flex;
   align-items:      center;
-  gap:              4px;
-  background-color: #050505;
-  border:           1px solid #1c2a1c;
-  border-radius:    var(--radius-sm);
+  gap:              6px;
+  background-color: var(--dos-blue);
+  border:           1px solid var(--dos-white);
   padding:          2px 6px;
-  font-size:        10px;
+  font-size:        12px;
   white-space:      nowrap;
   overflow:         hidden;
   text-overflow:    ellipsis;
-  transition:       background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
 .instr-cell__ch {
-  color:       var(--color-phosphor);
-  font-weight: var(--font-weight-bold);
-  min-width:   24px;
+  color:       var(--dos-white);
+  font-weight: 700;
 }
 
 .instr-cell__voice {
-  color:          var(--color-amber);
-  font-size:      9px;
-  letter-spacing: 0.04em;
-  min-width:   30px;
+  color:       var(--dos-yellow);
+  font-weight: 700;
 }
 
 .instr-cell__name {
-  color:         #cccccc;
-  white-space:   nowrap;
+  color:         var(--dos-white);
   overflow:      hidden;
   text-overflow: ellipsis;
 }
 
 .instr-cell.is-changed {
-  background-color: var(--color-amber);
-  border-color:     #ffffff;
-  box-shadow:       var(--glow-amber-sm);
+  background-color: var(--dos-white);
 }
 
-.instr-cell.is-changed .instr-cell__ch,
-.instr-cell.is-changed .instr-cell__voice,
-.instr-cell.is-changed .instr-cell__name {
-  color:       #000000;
-  font-weight: var(--font-weight-bold);
+.instr-cell.is-changed * {
+  color:       var(--dos-blue) !important;
+  font-weight: 700;
 }
-
 
 /* ==========================================================================
-   9. .status-bar — Bottom information bar
+   8. .channel-panel — Mute Buttons & VU Meters
    ========================================================================== */
-.status-bar {
+.channel-panel-section.dos-box {
+  background-color: var(--dos-blue);
+  border-left:      none;
+  border-right:     none;
+  border-top:       none;
+  border-bottom:    1px solid var(--dos-white);
+  padding:          3px 14px;
+  flex-shrink:      0;
+}
+
+.channel-panel {
+  display:          flex;
+  justify-content:  center;
+  align-items:      flex-end;
+  gap:              var(--cell-gap);
+  padding-left:     calc(var(--step-col-width) + var(--cell-gap));
+  overflow-x:       auto;
+}
+
+.channel-strip {
+  display:        flex;
+  flex-direction: column;
+  align-items:    center;
+  gap:            3px;
+  width:          var(--vu-bar-width);
+}
+
+.mute-btn {
+  display:          inline-flex;
+  align-items:      center;
+  justify-content:  center;
+  width:            var(--vu-bar-width);
+  height:           18px;
+  background-color: var(--dos-blue);
+  color:            var(--dos-white);
+  font-family:      var(--font-mono);
+  font-size:        11px;
+  font-weight:      700;
+  border:           1px solid var(--dos-white);
+  cursor:           pointer;
+  outline:          none;
+}
+
+.mute-btn:hover {
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
+}
+
+.mute-btn.is-muted {
+  background-color: var(--dos-red);
+  color:            var(--dos-white);
+  border-color:     var(--dos-red);
+  text-decoration:  line-through;
+}
+
+/* VU Meter */
+.vu-meter {
+  width:            var(--vu-bar-width);
+  height:           var(--vu-bar-max-height);
+  background-color: var(--dos-blue);
+  border:           1px solid var(--dos-white);
+  position:         relative;
+  overflow:         hidden;
+  display:          flex;
+  flex-direction:   column;
+  justify-content:  flex-end;
+}
+
+.vu-meter__bar {
+  width:            100%;
+  height:           0%;
+  background-color: var(--dos-white);
+  transform-origin: bottom center;
+  transition:       height 30ms linear;
+}
+
+/* Channel Instrument strip text */
+.channel-instr {
+  font-family:      var(--font-mono);
+  font-size:        10px;
+  font-weight:      700;
+  line-height:      1.1;
+  color:            var(--dos-white);
+  background-color: var(--dos-blue);
+  border:           1px solid var(--dos-white);
+  padding:          2px 2px;
+  width:            var(--vu-bar-width);
+  text-align:       center;
+  white-space:      nowrap;
+  overflow:         hidden;
+  text-overflow:    ellipsis;
+  cursor:           default;
+}
+
+.channel-instr.is-changed {
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
+  font-weight:      700;
+}
+
+/* ==========================================================================
+   9. .status-bar — Bottom Status Line
+   ========================================================================== */
+.status-bar.dos-status-bar {
   display:          flex;
   align-items:      center;
   justify-content:  space-between;
-  flex-wrap:        wrap;
-  gap:              var(--space-2) var(--space-6);
   height:           var(--status-bar-height);
-  padding:          0 var(--space-4);
-  background-color: var(--color-bg-raised);
-  border-top:       var(--border-accent);
-  box-shadow:       0 -1px 0 var(--color-phosphor-dim);
+  padding:          0 14px;
+  background-color: var(--dos-blue);
+  color:            var(--dos-white);
+  border-top:       1px solid var(--dos-white);
   flex-shrink:      0;
-  overflow:         hidden;
 }
 
 .status-bar__segment {
   display:     flex;
   align-items: center;
-  gap:         var(--space-3);
+  gap:         14px;
   white-space: nowrap;
 }
 
 .status-bar__item {
-  font-size:      var(--font-size-xs);
-  color:          var(--color-text-secondary);
-  letter-spacing: 0.06em;
-  font-weight:    var(--font-weight-medium);
-}
-
-.status-bar__item strong,
-.status-bar__value {
-  color:       var(--color-phosphor);
-  font-weight: var(--font-weight-bold);
-  text-shadow: var(--glow-phosphor-sm);
+  font-size:   13px;
+  color:       var(--dos-white);
+  font-weight: 700;
 }
 
 .status-bar__sep {
-  color:      var(--color-border);
-  font-size:  var(--font-size-xs);
-  user-select: none;
-}
-
-.status-bar__loop {
-  color:          var(--color-text-dim);
-  font-size:      var(--font-size-xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.status-bar__loop.is-active {
-  color:      var(--color-amber);
-  text-shadow: var(--glow-amber-sm);
-  animation:  blink 1s step-end infinite;
+  color: var(--dos-white);
 }
 
 .status-bar__instrument {
-  font-size:     var(--font-size-xs);
-  color:         var(--color-amber);
-  letter-spacing: 0.04em;
-  max-width:     200px;
-  overflow:      hidden;
+  font-size:   13px;
+  color:       var(--dos-white);
+  font-weight: 700;
+  max-width:   300px;
+  overflow:    hidden;
   text-overflow: ellipsis;
-  white-space:   nowrap;
 }
 
-
-/* ==========================================================================
-   10. .loading-overlay — Soundfont loading overlay
-   ========================================================================== */
-.loading-overlay {
-  position:         fixed;
-  inset:            0;
-  z-index:          9999;
-  background-color: var(--color-overlay-bg);
-  backdrop-filter:  blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  display:          flex;
-  flex-direction:   column;
-  align-items:      center;
-  justify-content:  center;
-  opacity:          0;
-  pointer-events:   none;
-  transition:       opacity var(--transition-slow);
-}
-
-.loading-overlay.is-visible {
-  opacity:        1;
-  pointer-events: auto;
-}
-
-.loading-overlay__box {
-  display:          flex;
-  flex-direction:   column;
-  align-items:      center;
-  justify-content:  center;
-  gap:              var(--space-3);
-  padding:          var(--space-5) var(--space-6);
-  background-color: #061006;
-  border:           1px solid var(--color-phosphor);
-  border-radius:    var(--radius-md);
-  box-shadow:       0 0 30px rgba(57, 255, 20, 0.25), inset 0 0 15px rgba(0, 0, 0, 0.85);
-  min-width:        320px;
-  max-width:        480px;
-  text-align:       center;
-}
-
-.loading-overlay__spinner {
-  width:            38px;
-  height:           38px;
-  border:           3px solid var(--color-phosphor-dim);
-  border-top-color: var(--color-phosphor);
-  border-radius:    50%;
-  animation:        spin 700ms linear infinite;
-  box-shadow:       var(--glow-phosphor-sm);
-  margin-bottom:    var(--space-1);
-}
-
-.loading-overlay__text {
-  font-size:      var(--font-size-sm);
-  font-weight:    var(--font-weight-bold);
-  color:          var(--color-phosphor);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  text-shadow:    var(--glow-phosphor-sm);
-}
-
-.loading-overlay__subtext {
-  font-size:      var(--font-size-xs);
-  color:          var(--color-amber);
-  letter-spacing: 0.05em;
-  min-height:     18px;
-  white-space:    nowrap;
-  overflow:       hidden;
-  text-overflow:  ellipsis;
-  max-width:      380px;
-}
-
-.loading-overlay__progress-wrap {
-  width:          100%;
-  display:        flex;
-  align-items:    center;
-  gap:            var(--space-3);
-  margin-top:     var(--space-2);
-}
-
-.loading-overlay__progress-bar {
-  flex:             1;
-  height:           10px;
-  background-color: #040804;
-  border:           1px solid var(--color-border);
-  border-radius:    var(--radius-sm);
-  overflow:         hidden;
-  position:         relative;
-}
-
-.loading-overlay__progress-fill {
-  height:           100%;
-  width:            0%;
-  background:       linear-gradient(90deg, var(--color-phosphor-dim) 0%, var(--color-phosphor) 100%);
-  box-shadow:       var(--glow-phosphor-sm);
-  transition:       width 120ms ease-out;
-}
-
-.loading-overlay__progress-pct {
-  font-size:      11px;
-  font-family:    var(--font-mono);
-  color:          var(--color-phosphor);
-  min-width:      36px;
-  text-align:     right;
-}
-
-
-/* ==========================================================================
-   Utilities
-   ========================================================================== */
-
-.sr-only {
-  position:   absolute;
-  width:      1px;
-  height:     1px;
-  padding:    0;
-  margin:     -1px;
-  overflow:   hidden;
-  clip:       rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border:     0;
-}
-
-.mono {
-  font-family: var(--font-mono);
-  font-size:   var(--font-size-sm);
-}
-
-[disabled],
-.is-disabled {
-  opacity:        0.35;
-  pointer-events: none;
-  cursor:         not-allowed;
-}
-
-.divider {
-  width:            100%;
-  height:           1px;
-  background-color: var(--color-border);
-  flex-shrink:      0;
-}
-
-
-/* ==========================================================================
-   Responsive — < 768px
-   ========================================================================== */
-@media (max-width: 767px) {
-
-  .header {
-    flex-wrap: wrap;
-    height:    auto;
-    padding:   var(--space-2) var(--space-3);
-    gap:       var(--space-2);
-  }
-
-  .header__logo { font-size: var(--font-size-md); }
-
-  #drop-zone {
-    width:     100%;
-    min-width: unset;
-  }
-
-  .song-info {
-    gap:     var(--space-2) var(--space-3);
-    padding: var(--space-2) var(--space-3);
-  }
-
-  .transport {
-    flex-direction: column;
-    align-items:    flex-start;
-    gap:            var(--space-2);
-    padding:        var(--space-2) var(--space-3);
-  }
-
-  .transport__buttons { flex-wrap: wrap; }
-
-  .pattern-grid {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: var(--space-2) var(--space-3);
-  }
-
-  .channel-panel {
-    flex-wrap:  nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding:    var(--space-2) var(--space-3);
-  }
-
-  .status-bar {
-    height:    auto;
-    padding:   var(--space-1) var(--space-3);
-    flex-wrap: wrap;
-    gap:       2px var(--space-3);
-  }
-
-  .status-bar__instrument { max-width: 140px; }
-}
-
-/* Very small screens */
-@media (max-width: 480px) {
-  :root {
-    --cell-size:      22px;
-    --ch-label-width: 36px;
-  }
-
-  .header__logo { font-size: var(--font-size-base); }
-
-  .transport__btn {
-    min-width: 52px;
-    padding:   var(--space-1) var(--space-2);
-    font-size: var(--font-size-xs);
-  }
+.status-bar__loop {
+  font-size:   13px;
+  color:       var(--dos-white);
+  font-weight: 700;
 }
 
 /* ==========================================================================
-   Song Selector Modal
+   10. Modal Dialogs — Song Selector (Blue & White Dialog Box)
    ========================================================================== */
 .modal-backdrop {
   position:         fixed;
   inset:            0;
-  background-color: rgba(0, 0, 0, 0.82);
-  backdrop-filter:  blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background-color: rgba(0, 0, 0, 0.6);
   z-index:          1000;
   display:          flex;
   align-items:      center;
   justify-content:  center;
-  padding:          var(--space-4);
+  padding:          16px;
   opacity:          0;
   visibility:       hidden;
-  transition:       opacity var(--transition-fast), visibility var(--transition-fast);
 }
 
 .modal-backdrop.is-open {
@@ -1419,166 +862,304 @@ body {
   visibility: visible;
 }
 
-.modal-dialog {
+.dos-modal-box {
   display:          flex;
   flex-direction:   column;
   width:            100%;
-  max-width:        680px;
+  max-width:        780px;
   max-height:       85vh;
-  background-color: #0a140a;
-  border:           1px solid var(--color-phosphor);
-  border-radius:    var(--radius-md);
-  box-shadow:       0 0 35px rgba(57, 255, 20, 0.25), inset 0 0 15px rgba(0, 0, 0, 0.9);
+  background-color: var(--dos-blue);
+  border:           3px double var(--dos-white);
+  box-shadow:       var(--shadow-dos);
   overflow:         hidden;
-  animation:        modal-pop 0.15s ease-out;
 }
 
-@keyframes modal-pop {
-  from { transform: scale(0.96); opacity: 0; }
-  to   { transform: scale(1.0);  opacity: 1; }
-}
-
-.modal-header {
+.dos-modal-header {
   display:          flex;
   align-items:      center;
   justify-content:  space-between;
-  padding:          var(--space-3) var(--space-4);
-  background-color: #061006;
-  border-bottom:    1px solid var(--color-border);
+  padding:          8px 14px;
+  background-color: var(--dos-blue);
+  color:            var(--dos-white);
+  border-bottom:    1px solid var(--dos-white);
 }
 
 .modal-title {
-  font-size:      var(--font-size-sm);
-  font-weight:    var(--font-weight-bold);
-  color:          var(--color-amber);
-  letter-spacing: 0.08em;
+  font-size:   14px;
+  font-weight: 700;
+  color:       var(--dos-white);
 }
 
-.modal-close-btn {
-  background:     transparent;
-  border:         1px solid var(--color-border);
-  color:          var(--color-text-dim);
+.dos-btn-close {
+  background:     var(--dos-blue);
+  border:         1px solid var(--dos-white);
+  color:          var(--dos-white);
   font-family:    var(--font-mono);
-  font-size:      11px;
-  padding:        3px 8px;
-  border-radius:  var(--radius-sm);
+  font-size:      12px;
+  font-weight:    700;
+  padding:        2px 8px;
   cursor:         pointer;
-  transition:     all var(--transition-fast);
 }
 
-.modal-close-btn:hover {
-  border-color:     #ff4444;
-  color:            #ffffff;
-  background-color: rgba(255, 68, 68, 0.2);
+.dos-btn-close:hover {
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
 }
 
-.modal-search-wrap {
-  padding:          var(--space-3) var(--space-4);
-  background-color: #081208;
-  border-bottom:    1px solid var(--color-border-dim);
+.dos-search-wrap {
+  display:          flex;
+  align-items:      center;
+  gap:              10px;
+  padding:          8px 14px;
+  background-color: var(--dos-blue);
+  border-bottom:    1px solid var(--dos-white);
 }
 
-.modal-search-input {
-  width:            100%;
-  height:           32px;
-  padding:          0 var(--space-3);
+.dos-prompt {
+  color:       var(--dos-white);
+  font-weight: 700;
+  font-size:   14px;
+}
+
+.dos-input {
+  flex:             1;
+  height:           28px;
+  padding:          0 8px;
   font-family:      var(--font-mono);
-  font-size:        var(--font-size-xs);
-  color:            var(--color-phosphor);
-  background-color: #040804;
-  border:           1px solid var(--color-border);
-  border-radius:    var(--radius-sm);
+  font-size:        14px;
+  font-weight:      700;
+  color:            var(--dos-white);
+  background-color: var(--dos-blue);
+  border:           1px solid var(--dos-white);
   outline:          none;
-  transition:       border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.modal-search-input:focus {
-  border-color: var(--color-phosphor);
-  box-shadow:   var(--glow-phosphor-sm);
+.dos-input:focus {
+  background-color: #000088;
 }
 
-.modal-songs-list {
+.dos-list-header {
+  display:          grid;
+  grid-template-columns: 42px 1fr 160px 80px 60px;
+  padding:          6px 14px;
+  background-color: var(--dos-blue);
+  color:            var(--dos-white);
+  font-size:        12px;
+  font-weight: 700;
+  border-bottom:    1px solid var(--dos-white);
+}
+
+.dos-songs-list {
   flex:             1;
   overflow-y:       auto;
-  max-height:       52vh;
-  padding:          var(--space-2);
+  max-height:       50vh;
+  padding:          3px;
   display:          flex;
   flex-direction:   column;
   gap:              2px;
+  background-color: var(--dos-blue);
 }
 
 .modal-song-item {
-  display:          flex;
-  align-items:      center;
-  gap:              var(--space-3);
-  padding:          7px var(--space-3);
-  border-radius:    var(--radius-sm);
-  border:           1px solid transparent;
-  background-color: transparent;
-  color:            var(--color-text-primary);
-  font-family:      var(--font-mono);
-  font-size:        var(--font-size-xs);
-  cursor:           pointer;
-  text-align:       left;
-  user-select:      none;
-  transition:       background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  display:               grid;
+  grid-template-columns: 42px 1fr 160px 80px 60px;
+  align-items:           center;
+  padding:               5px 10px;
+  border:                none;
+  background-color:      var(--dos-blue);
+  color:                 var(--dos-white);
+  font-family:           var(--font-mono);
+  font-size:             13px;
+  font-weight:           600;
+  cursor:                pointer;
+  text-align:            left;
+  user-select:           none;
 }
 
+/* Selected item in Song list */
 .modal-song-item:hover,
-.modal-song-item:focus {
-  background-color: rgba(57, 255, 20, 0.12);
-  border-color:     var(--color-phosphor);
-  color:            #ffffff;
+.modal-song-item:focus,
+.modal-song-item.is-selected {
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
+  font-weight:      700;
   outline:          none;
 }
 
+.modal-song-item:hover .modal-song-name,
+.modal-song-item:focus .modal-song-name,
+.modal-song-item.is-selected .modal-song-name,
+.modal-song-item:hover .modal-song-file,
+.modal-song-item.is-selected .modal-song-file,
+.modal-song-item:hover .modal-song-badge,
+.modal-song-item.is-selected .modal-song-badge,
+.modal-song-item:hover .modal-song-idx,
+.modal-song-item.is-selected .modal-song-idx {
+  color: var(--dos-blue) !important;
+}
+
 .modal-song-idx {
-  color:          var(--color-text-dim);
-  font-size:      11px;
-  min-width:      28px;
+  color: var(--dos-white);
 }
 
 .modal-song-name {
-  flex:           1;
-  color:          var(--color-phosphor);
-  font-weight:    var(--font-weight-medium);
-  white-space:    nowrap;
-  overflow:       hidden;
-  text-overflow:  ellipsis;
+  color:         var(--dos-white);
+  font-weight:   700;
+  white-space:   nowrap;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  padding-right: 8px;
 }
 
 .modal-song-file {
-  color:          var(--color-amber);
-  font-size:      11px;
-  opacity:        0.85;
+  color:         var(--dos-white);
+  opacity:       0.85;
+  white-space:   nowrap;
+  overflow:      hidden;
+  text-overflow: ellipsis;
 }
 
 .modal-song-badge {
-  font-size:        10px;
-  color:            var(--color-text-dim);
-  background-color: #061006;
-  padding:          1px 5px;
-  border-radius:    2px;
-  border:           1px solid #142814;
+  color: var(--dos-white);
 }
 
-.modal-footer {
-  padding:          var(--space-2) var(--space-4);
-  background-color: #061006;
-  border-top:       1px solid var(--color-border);
-  font-size:        11px;
-  color:            var(--color-text-dim);
+.dos-modal-footer {
   display:          flex;
   align-items:      center;
   justify-content:  space-between;
+  padding:          8px 14px;
+  background-color: var(--dos-blue);
+  color:            var(--dos-white);
+  border-top:       1px solid var(--dos-white);
+  font-size:        13px;
+  font-weight:      700;
 }
 
-.modal-footer kbd {
-  background:    #112211;
-  border:        1px solid #224422;
-  border-radius: 3px;
-  padding:       1px 4px;
-  color:         var(--color-amber);
-  font-family:   var(--font-mono);
-  font-size:     10px;
+.dos-modal-footer kbd {
+  background:    var(--dos-blue);
+  color:         var(--dos-white);
+  padding:       2px 6px;
+  border:        1px solid var(--dos-white);
+}
+
+/* ==========================================================================
+   11. .loading-overlay — DOS Loading Dialog Box
+   ========================================================================== */
+.loading-overlay {
+  position:         fixed;
+  inset:            0;
+  z-index:          9999;
+  background-color: rgba(0, 0, 0, 0.6);
+  display:          flex;
+  align-items:      center;
+  justify-content:  center;
+  opacity:          0;
+  pointer-events:   none;
+}
+
+.loading-overlay.is-visible {
+  opacity:        1;
+  pointer-events: auto;
+}
+
+.dos-dialog-box {
+  display:          flex;
+  flex-direction:   column;
+  align-items:      center;
+  justify-content:  center;
+  gap:              10px;
+  padding:          20px 28px;
+  background-color: var(--dos-blue);
+  border:           3px double var(--dos-white);
+  box-shadow:       var(--shadow-dos);
+  min-width:        360px;
+  max-width:        500px;
+  text-align:       center;
+}
+
+.dos-dialog-title {
+  color:       var(--dos-white);
+  font-size:   13px;
+  font-weight: 700;
+}
+
+.dos-spinner {
+  width:            28px;
+  height:           28px;
+  border:           3px solid var(--dos-blue);
+  border-top-color: var(--dos-white);
+  border-radius:    50%;
+  animation:        spin 600ms linear infinite;
+}
+
+.loading-overlay__text {
+  font-size:      15px;
+  font-weight:    700;
+  color:          var(--dos-white);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.loading-overlay__subtext {
+  font-size:     12px;
+  color:         var(--dos-white);
+  opacity:       0.85;
+  min-height:    18px;
+  white-space:   nowrap;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  max-width:     380px;
+}
+
+.loading-overlay__progress-wrap {
+  width:       100%;
+  display:     flex;
+  align-items: center;
+  gap:         10px;
+}
+
+.dos-bar-frame {
+  flex:             1;
+  height:           14px;
+  background-color: var(--dos-blue);
+  border:           1px solid var(--dos-white);
+  overflow:         hidden;
+}
+
+.loading-overlay__progress-fill {
+  height:           100%;
+  width:            0%;
+  background-color: var(--dos-white);
+}
+
+.loading-overlay__progress-pct {
+  font-size:   13px;
+  font-weight: 700;
+  color:       var(--dos-white);
+  min-width:   40px;
+  text-align:  right;
+}
+
+.dos-dialog-footer-hint {
+  font-size: 11px;
+  color:     var(--dos-white);
+  opacity:   0.8;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+@media (max-width: 768px) {
+  .header.dos-panel-header {
+    flex-wrap: wrap;
+    height:    auto;
+    padding:   8px;
+  }
+
+  .transport.dos-box {
+    flex-direction: column;
+    height:         auto;
+    align-items:    flex-start;
+    padding:        8px;
+  }
 }
