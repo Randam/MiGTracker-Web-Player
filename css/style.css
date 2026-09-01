@@ -36,6 +36,11 @@
   --vu-bar-max-height: 24px;
   --position-bar-h:    6px;
 
+  /* --- Horizontal Track View Dimensions --- */
+  --h-header-width:    230px;
+  --h-cell-width:      54px;
+  --h-row-height:      24px;
+
   /* --- Box Shadows --- */
   --shadow-dos: 8px 8px 0px #000000;
 }
@@ -605,6 +610,163 @@ body.dos-body {
   background-color: var(--dos-yellow);
   color:            var(--dos-blue);
   font-weight:      700;
+}
+
+/* ==========================================================================
+   6b. Horizontal Tracks Layout (Channels as Rows, Steps 00..15 as Columns)
+   ========================================================================== */
+.pattern-grid__inner--horizontal {
+  display:               grid;
+  grid-template-columns: var(--h-header-width) repeat(16, var(--h-cell-width));
+  grid-auto-rows:        var(--h-row-height);
+  gap:                   var(--cell-gap);
+  width:                 fit-content;
+  background-color:      var(--dos-white); /* grid border lines */
+  border:                1px solid var(--dos-white);
+}
+
+/* Horizontal Top-Left Header: [ CH / INSTRUMENT ] */
+.h-top-hdr {
+  display:          flex;
+  align-items:      center;
+  justify-content:  space-between;
+  padding:          0 8px;
+  height:           var(--h-row-height);
+  font-size:        12px;
+  font-weight:      700;
+  color:            var(--dos-white);
+  background-color: var(--dos-blue);
+  letter-spacing:   0.04em;
+  text-transform:   uppercase;
+  white-space:      nowrap;
+  border-bottom:    1px solid var(--dos-white);
+}
+
+/* Horizontal Step Column Headers: [00] .. [15] */
+.h-step-hdr {
+  display:          flex;
+  align-items:      center;
+  justify-content:  center;
+  height:           var(--h-row-height);
+  width:            var(--h-cell-width);
+  font-size:        13px;
+  font-weight:      700;
+  color:            var(--dos-white);
+  background-color: var(--dos-blue);
+  white-space:      nowrap;
+  border-bottom:    1px solid var(--dos-white);
+  user-select:      none;
+}
+
+.h-step-hdr.active-step {
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
+}
+
+/* Horizontal Channel Row Header (Left Column of each channel row) */
+.h-ch-header {
+  display:          flex;
+  align-items:      center;
+  gap:              6px;
+  padding:          0 6px;
+  height:           var(--h-row-height);
+  background-color: var(--dos-blue);
+  overflow:         hidden;
+  white-space:      nowrap;
+  user-select:      none;
+}
+
+.h-ch-header--drum {
+  background-color: #000088;
+}
+
+/* Channel Badge button */
+.h-ch-badge {
+  display:          inline-flex;
+  align-items:      center;
+  justify-content:  center;
+  padding:          1px 4px;
+  min-width:        32px;
+  height:           18px;
+  background-color: var(--dos-blue);
+  color:            var(--dos-white);
+  border:           1px solid var(--dos-white);
+  font-family:      var(--font-mono);
+  font-size:        11px;
+  font-weight:      700;
+  cursor:           pointer;
+  flex-shrink:      0;
+  outline:          none;
+}
+
+.h-ch-badge:hover {
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
+}
+
+.h-ch-badge.is-muted {
+  background-color: var(--dos-red) !important;
+  color:            var(--dos-white) !important;
+  border-color:     var(--dos-red) !important;
+  text-decoration:  line-through;
+}
+
+.h-ch-badge--drum {
+  color:        var(--dos-yellow);
+  border-color: var(--dos-yellow);
+}
+
+/* Instrument / Voice Name label */
+.h-ch-instr {
+  flex:             1;
+  font-size:        11px;
+  font-weight:      600;
+  color:            var(--dos-white);
+  overflow:         hidden;
+  text-overflow:    ellipsis;
+  white-space:      nowrap;
+}
+
+.h-ch-instr.is-changed {
+  background-color: var(--dos-white);
+  color:            var(--dos-blue);
+  font-weight:      700;
+  padding:          0 2px;
+}
+
+/* Inline Mini VU Meter */
+.h-vu-meter {
+  width:            32px;
+  height:           10px;
+  background-color: var(--dos-blue);
+  border:           1px solid var(--dos-white);
+  position:         relative;
+  overflow:         hidden;
+  flex-shrink:      0;
+  display:          flex;
+  align-items:      center;
+}
+
+.h-vu-bar {
+  height:           100%;
+  width:            0%;
+  background-color: var(--dos-white);
+  transform-origin: left center;
+  transition:       width 30ms linear;
+}
+
+.h-vu-bar.is-active {
+  background-color: var(--dos-yellow);
+}
+
+/* Muted row dimming */
+.grid-cell.is-muted-row {
+  opacity: 0.25 !important;
+}
+
+/* Hide bottom channel panel in horizontal mode (channel headers are already in the grid) */
+.dos-app.is-layout-horizontal .channel-panel-section {
+  display: none !important;
 }
 
 /* ==========================================================================

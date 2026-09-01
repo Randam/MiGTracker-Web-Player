@@ -112,6 +112,7 @@ export class PlayerUI {
     this.vuLevels      = new Float32Array(18);      // index 1–17, decay-based VU
     this.channelVoices = new Uint8Array(18).fill(1); // 1-based current voice per tracker channel
     this._vuTimer      = null;
+    this.layoutMode    = localStorage.getItem('mtp_layout_mode') || 'vertical';
 
     this._bindDOM();
     this._buildGrid();
@@ -140,6 +141,12 @@ export class PlayerUI {
       loopLabel?.classList.toggle('is-active', loopCb.checked);
     });
     this.player.on('loaded', () => this.player.setLoop(loopCb.checked));
+
+    // Layout toggle button (Horizontal / Vertical Tracks)
+    const layoutBtn = this._$('btn-toggle-layout');
+    if (layoutBtn) {
+      layoutBtn.addEventListener('click', () => this._toggleLayout());
+    }
 
     // Drum Mode toggle button
     const drumBtn = this._$('btn-drum-mode');
@@ -252,9 +259,53 @@ export class PlayerUI {
     });
   }
 
-  // ── Vertical Pattern Grid (Columns = Channels, Rows = Steps 00..15) ──────────
+  // ── Layout & Pattern Grid (Vertical & Horizontal modes) ──────────────────────
 
   _buildGrid() {
+    const app = this._$('app');
+    const layoutBtn = this._$('btn-toggle-layout');
+    const isHorizontal = this.layoutMode === 'horizontal';
+
+    if (app) {
+      app.classList.toggle('is-layout-horizontal', isHorizontal);
+    }
+    if (layoutBtn) {
+      layoutBtn.textContent = isHorizontal ? '[ ⬍ VERT VIEW ]' : '[ ⬌ HORIZ VIEW ]';
+      layoutBtn.title = isHorizontal
+        ? 'Switch to Vertical Tracks (Columns = Channels, Rows = Steps) [Shortcut: L or V]'
+        : 'Switch to Horizontal Tracks (Rows = Channels, Columns = Steps) [Shortcut: L or V]';
+    }
+
+    if (isHorizontal) {
+      this._buildHorizontalGrid();
+    } else {
+      this._buildVerticalGrid();
+    }
+  }
+
+  _toggleLayout() {
+    this.layoutMode = this.layoutMode === 'vertical' ? 'horizontal' : 'vertical';
+    try {
+      localStorage.setItem('mtp_layout_mode', this.layoutMode);
+    } catch { /* ignore */ }
+
+    this._buildGrid();
+
+    // If song is loaded, immediately refresh the pattern data on the new grid
+    const song = this.player._song;
+    if (song && song.positions.length > 0) {
+      const seq = this.player._sequencer;
+      const pos = seq ? seq.number : 1;
+      const stepIdx = seq ? seq.step - 1 : -1;
+      const track = (seq && seq.number && song.positions[seq.number - 1]) ? song.positions[seq.number - 1] : song.positions[pos - 1];
+      const patIdx = track > 0 ? track - 1 : (song.positions[pos - 1] - 1);
+      this._updateGrid(song.patterns[patIdx], stepIdx);
+    }
+  }
+
+  // ── Vertical Pattern Grid (Columns = Channels, Rows = Steps 00..15) ──────────
+
+  _buildVerticalGrid() {
     const grid = this._$('pattern-grid');
     if (!grid) return;
     grid.innerHTML = '';
@@ -290,7 +341,6 @@ export class PlayerUI {
 
     // ── Rows 1..16: Steps 00..15 top-to-bottom ──
     for (let st = 0; st < 16; st++) {
-      // Step number label at left of row
       const stepLbl = document.createElement('div');
       stepLbl.className   = 'step-label';
       stepLbl.id          = `step-lbl-${st}`;
@@ -299,9 +349,93 @@ export class PlayerUI {
 
       // 17 channel cells for this step
       for (let ch = 0; ch < 17; ch++) {
+        const isMuted = !!this.muted[ch + 1];
         const cell = document.createElement('div');
-        cell.className   = `grid-cell${ch >= 15 ? ' drum' : ''}`;
+        cell.className   = `grid-cell${ch >= 15 ? ' drum' : ''}${isMuted ? ' is-muted-col' : ''}`;
         cell.id          = `cell-${ch}-${st}`;
+        cell.textContent = '···';
+        inner.appendChild(cell);
+      }
+    }
+
+    grid.appendChild(inner);
+  }
+
+  // ── Horizontal Pattern Grid (Rows = Channels, Columns = Steps 00..15) ────────
+
+  _buildHorizontalGrid() {
+    const grid = this._$('pattern-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    const inner = document.createElement('div');
+    inner.className = 'pattern-grid__inner--horizontal';
+
+    // ── Row 0: Header Row [ CH / INSTRUMENT ] [00] [01] ... [15] ──
+    const topHdr = document.createElement('div');
+    topHdr.className = 'h-top-hdr';
+    topHdr.textContent = 'CH / INSTRUMENT';
+    inner.appendChild(topHdr);
+
+    for (let st = 0; st < 16; st++) {
+      const stepHdr = document.createElement('div');
+      stepHdr.className   = 'h-step-hdr';
+      stepHdr.id          = `step-h-hdr-${st}`;
+      stepHdr.textContent = String(st).padStart(2, '0');
+      inner.appendChild(stepHdr);
+    }
+
+    // ── Rows 1..17: 17 Channel Rows (C01..C15, DR1, DR2) ──
+    for (let ch = 0; ch < 17; ch++) {
+      const trackerCh = ch + 1;
+      const isDrum = ch >= 15;
+      const isMuted = !!this.muted[trackerCh];
+      const chLabel = isDrum ? `DR${ch - 14}` : `C${String(ch + 1).padStart(2, '0')}`;
+
+      const voice = this.channelVoices[trackerCh] || (isDrum ? 128 : 1);
+      const prog = (voice > 0 && !isDrum) ? voice - 1 : 0;
+      const instrName = isDrum ? 'Percussion' : (GM_NAMES[prog] ?? `Prog #${prog}`);
+
+      // Row Header (Left column)
+      const rowHdr = document.createElement('div');
+      rowHdr.className = `h-ch-header${isDrum ? ' h-ch-header--drum' : ''}`;
+      rowHdr.id = `h-ch-hdr-${ch}`;
+
+      // Channel Badge (click to mute)
+      const badge = document.createElement('button');
+      badge.className = `h-ch-badge${isDrum ? ' h-ch-badge--drum' : ''}${isMuted ? ' is-muted' : ''}`;
+      badge.id = `h-ch-badge-${ch}`;
+      badge.textContent = chLabel;
+      badge.title = `Channel ${chLabel} (Click to toggle mute)`;
+      badge.setAttribute('type', 'button');
+      badge.setAttribute('aria-pressed', String(isMuted));
+      badge.addEventListener('click', () => this._toggleMute(trackerCh));
+      rowHdr.appendChild(badge);
+
+      // Live Instrument name
+      const instrLbl = document.createElement('div');
+      instrLbl.className = 'h-ch-instr';
+      instrLbl.id = `h-ch-instr-${ch}`;
+      instrLbl.textContent = instrName;
+      instrLbl.title = isDrum ? 'Drum Kit (Percussion)' : `Channel ${trackerCh}: [Voice ${voice}] ${instrName}`;
+      rowHdr.appendChild(instrLbl);
+
+      // Mini inline VU Meter
+      const vuWrap = document.createElement('div');
+      vuWrap.className = 'h-vu-meter';
+      const vuBar = document.createElement('div');
+      vuBar.className = 'h-vu-bar';
+      vuBar.id = `vu-bar-h-${trackerCh}`;
+      vuWrap.appendChild(vuBar);
+      rowHdr.appendChild(vuWrap);
+
+      inner.appendChild(rowHdr);
+
+      // 16 Step cells for this channel row
+      for (let st = 0; st < 16; st++) {
+        const cell = document.createElement('div');
+        cell.className = `grid-cell${isDrum ? ' drum' : ''}${isMuted ? ' is-muted-row' : ''}`;
+        cell.id = `cell-h-${ch}-${st}`;
         cell.textContent = '···';
         inner.appendChild(cell);
       }
@@ -313,31 +447,63 @@ export class PlayerUI {
   _updateGrid(pattern, activeStepIdx) {
     if (!pattern) return;
 
-    for (let st = 0; st < 16; st++) {
-      const isStepActive = (st === activeStepIdx);
-      const stepLbl = this._$(`step-lbl-${st}`);
-      if (stepLbl) stepLbl.classList.toggle('active-step', isStepActive);
+    if (this.layoutMode === 'horizontal') {
+      for (let st = 0; st < 16; st++) {
+        const isStepActive = (st === activeStepIdx);
+        const stepHdr = this._$(`step-h-hdr-${st}`);
+        if (stepHdr) stepHdr.classList.toggle('active-step', isStepActive);
 
-      for (let ch = 0; ch < 17; ch++) {
-        const cell = this._$(`cell-${ch}-${st}`);
-        if (!cell) continue;
+        for (let ch = 0; ch < 17; ch++) {
+          const cell = this._$(`cell-h-${ch}-${st}`);
+          if (!cell) continue;
 
-        const val = pattern[ch]?.[st] ?? 0;
+          const val = pattern[ch]?.[st] ?? 0;
+          const isMuted = !!this.muted[ch + 1];
 
-        // Reset classes
-        cell.className = `grid-cell${ch >= 15 ? ' drum' : ''}`;
+          // Reset classes
+          cell.className = `grid-cell${ch >= 15 ? ' drum' : ''}${isMuted ? ' is-muted-row' : ''}`;
 
-        if (isStepActive) {
-          cell.classList.add('active-step-row');
+          if (isStepActive) {
+            cell.classList.add('active-step-row');
+          }
+
+          const hasNote = val > 0 && val < 96;
+          const hasCmd  = val >= 96;
+
+          if (hasNote) cell.classList.add('has-note');
+          if (hasCmd)  cell.classList.add('has-cmd');
+
+          cell.textContent = formatCell(val, ch);
         }
+      }
+    } else {
+      for (let st = 0; st < 16; st++) {
+        const isStepActive = (st === activeStepIdx);
+        const stepLbl = this._$(`step-lbl-${st}`);
+        if (stepLbl) stepLbl.classList.toggle('active-step', isStepActive);
 
-        const hasNote = val > 0 && val < 96;
-        const hasCmd  = val >= 96;
+        for (let ch = 0; ch < 17; ch++) {
+          const cell = this._$(`cell-${ch}-${st}`);
+          if (!cell) continue;
 
-        if (hasNote) cell.classList.add('has-note');
-        if (hasCmd)  cell.classList.add('has-cmd');
+          const val = pattern[ch]?.[st] ?? 0;
+          const isMuted = !!this.muted[ch + 1];
 
-        cell.textContent = formatCell(val, ch);
+          // Reset classes
+          cell.className = `grid-cell${ch >= 15 ? ' drum' : ''}${isMuted ? ' is-muted-col' : ''}`;
+
+          if (isStepActive) {
+            cell.classList.add('active-step-row');
+          }
+
+          const hasNote = val > 0 && val < 96;
+          const hasCmd  = val >= 96;
+
+          if (hasNote) cell.classList.add('has-note');
+          if (hasCmd)  cell.classList.add('has-cmd');
+
+          cell.textContent = formatCell(val, ch);
+        }
       }
     }
   }
@@ -357,11 +523,21 @@ export class PlayerUI {
   _tickVU() {
     for (let ch = 1; ch <= 17; ch++) {
       if (this.vuLevels[ch] > 0) this.vuLevels[ch] = Math.max(0, this.vuLevels[ch] - 0.08);
+      const pct = (this.vuLevels[ch] * 100).toFixed(1) + '%';
+      const isActive = this.vuLevels[ch] > 0.01;
+
+      // Vertical layout VU meter (bottom strip)
       const bar = this._$(`vu-bar-${ch}`);
       if (bar) {
-        const pct = (this.vuLevels[ch] * 100).toFixed(1) + '%';
         bar.style.height = pct;
-        bar.classList.toggle('is-active', this.vuLevels[ch] > 0.01);
+        bar.classList.toggle('is-active', isActive);
+      }
+
+      // Horizontal layout VU meter (inline row)
+      const hBar = this._$(`vu-bar-h-${ch}`);
+      if (hBar) {
+        hBar.style.width = pct;
+        hBar.classList.toggle('is-active', isActive);
       }
     }
   }
@@ -547,6 +723,12 @@ export class PlayerUI {
         return;
       }
 
+      if ((e.key === 'l' || e.key === 'L' || e.key === 'v' || e.key === 'V') && !inInput) {
+        e.preventDefault();
+        this._toggleLayout();
+        return;
+      }
+
       if (e.key === 'Escape') {
         this._closeSongModal?.();
       }
@@ -577,6 +759,7 @@ export class PlayerUI {
 
     this._buildMutePanel();
     this._buildInspectorGrid();
+    this._buildGrid();
     if (this._$('pos-fill')) this._$('pos-fill').style.width = '0%';
 
     // Immediately render initial pattern into the grid
@@ -772,10 +955,10 @@ export class PlayerUI {
   _updateChannelInstrumentUI(trackerCh, voiceNum, isFlash = false) {
     const isDrum = trackerCh > 15;
     const prog = (voiceNum > 0 && !isDrum) ? voiceNum - 1 : 0;
-    const name = isDrum ? 'Percussion Kit' : (GM_NAMES[prog] ?? `Prog #${prog}`);
+    const name = isDrum ? 'Percussion' : (GM_NAMES[prog] ?? `Prog #${prog}`);
     const voiceTag = isDrum ? 'P128' : `P${String(voiceNum).padStart(3, '0')}`;
 
-    // 1. Update strip label under channel strip
+    // 1. Update strip label under vertical channel strip
     const stripLbl = this._$(`strip-instr-${trackerCh}`);
     if (stripLbl) {
       stripLbl.textContent = isDrum ? 'DRUMS' : `P${voiceNum} ${name}`;
@@ -799,6 +982,17 @@ export class PlayerUI {
         setTimeout(() => inspCell.classList.remove('is-changed'), 800);
       }
     }
+
+    // 3. Update horizontal layout row instrument name
+    const hInstr = this._$(`h-ch-instr-${trackerCh - 1}`);
+    if (hInstr) {
+      hInstr.textContent = name;
+      hInstr.title = isDrum ? 'Drum Kit (Percussion)' : `Channel ${trackerCh}: [Voice ${voiceNum}] ${name}`;
+      if (isFlash) {
+        hInstr.classList.add('is-changed');
+        setTimeout(() => hInstr.classList.remove('is-changed'), 800);
+      }
+    }
   }
 
   _toggleMute(trackerCh) {
@@ -806,24 +1000,35 @@ export class PlayerUI {
     const isMuted = !!this.muted[trackerCh];
     const chIdx = trackerCh - 1;
 
-    // Update bottom mute button
+    // Update bottom mute button (vertical mode)
     const btn = this._$(`mute-${trackerCh}`);
     if (btn) {
       btn.classList.toggle('is-muted', isMuted);
       btn.setAttribute('aria-pressed', String(isMuted));
     }
 
-    // Update top column header in pattern grid
+    // Update top column header in vertical pattern grid
     const hdr = this._$(`col-hdr-${chIdx}`);
     if (hdr) {
       hdr.classList.toggle('is-muted', isMuted);
       hdr.setAttribute('aria-pressed', String(isMuted));
     }
 
-    // Dim/undim all cells in this grid column
+    // Dim/undim all cells in vertical grid column
     for (let st = 0; st < 16; st++) {
       const cell = this._$(`cell-${chIdx}-${st}`);
       cell?.classList.toggle('is-muted-col', isMuted);
+    }
+
+    // Update horizontal row badge & cells
+    const hBadge = this._$(`h-ch-badge-${chIdx}`);
+    if (hBadge) {
+      hBadge.classList.toggle('is-muted', isMuted);
+      hBadge.setAttribute('aria-pressed', String(isMuted));
+    }
+    for (let st = 0; st < 16; st++) {
+      const hCell = this._$(`cell-h-${chIdx}-${st}`);
+      hCell?.classList.toggle('is-muted-row', isMuted);
     }
 
     // Mute/unmute corresponding MIDI channel in synth
