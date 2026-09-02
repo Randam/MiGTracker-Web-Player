@@ -133,25 +133,21 @@ export class MTPSequencer extends EventTarget {
   }
 
   /**
-   * Scale tracker channel volume (0..63) to MIDI velocity (40..127).
-   * Tracker volume 0 = 0 (rest), 1 = 40 (pp), 63 = 127 (fff).
+   * Scale tracker channel volume (0..63) to MIDI velocity (0..127).
+   * Tracker volume 0 = 0 (rest), 63 = 127.
    */
   _trackerVolToMIDI(vol) {
     if (vol <= 0) return 0;
-    const minMidi = 40;
-    const maxMidi = 127;
-    return Math.min(maxMidi, Math.max(1, Math.round(minMidi + ((vol - 1) / 62) * (maxMidi - minMidi))));
+    return Math.min(127, Math.max(1, Math.round(vol * 2.016)));
   }
 
   /**
-   * Scale tracker drum volume (0..15) to MIDI velocity (45..127).
-   * Tracker drum volume 0 = 0, 1 = 45 (pp), 15 = 127 (fff).
+   * Scale tracker drum volume (0..15) to MIDI velocity (0..127).
+   * Tracker drum volume 0 = 0, 15 = 127.
    */
   _trackerDrumVolToMIDI(vol) {
     if (vol <= 0) return 0;
-    const minMidi = 45;
-    const maxMidi = 127;
-    return Math.min(maxMidi, Math.max(1, Math.round(minMidi + ((vol - 1) / 14) * (maxMidi - minMidi))));
+    return Math.min(127, Math.max(1, Math.round(vol * 8.46)));
   }
 
   _dispatchEvent(type, detail) {
@@ -197,7 +193,10 @@ export class MTPSequencer extends EventTarget {
       const midiCh = this._midiCh(t1);
 
       // Speed (181..190)
-      if (v > 180 && v < 191) this.speed = v - 181;
+      if (v > 180 && v < 191) {
+        this.speed = v - 181;
+        events.push({ type: 'speed', speed: this.speed });
+      }
 
       // End-of-pattern: the NEXT step (si+1) contains 191
       if (si + 1 < 16 && (row[si + 1] ?? 0) === 191) this.endofpattern = true;

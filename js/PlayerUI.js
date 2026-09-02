@@ -540,6 +540,18 @@ export class PlayerUI {
         hBar.classList.toggle('is-active', isActive);
       }
     }
+
+    // Active voices counter in bottom status bar
+    const voiceEl = this._$('status-voices');
+    if (voiceEl) {
+      let count = this.player?.activeVoiceCount ?? 0;
+      if (count === 0 && this.player?.isPlaying) {
+        for (let c = 1; c <= 17; c++) {
+          if (this.vuLevels[c] > 0.05) count++;
+        }
+      }
+      voiceEl.textContent = `VOICES:${String(count).padStart(2, '0')}`;
+    }
   }
 
   // ── Event handlers ────────────────────────────────────────────────────────
@@ -833,6 +845,8 @@ export class PlayerUI {
     if (state !== 'playing') {
       this._stopVU();
       if (state === 'stopped') {
+        const voiceEl = this._$('status-voices');
+        if (voiceEl) voiceEl.textContent = 'VOICES:00';
         const song = this.player._song;
         if (song) {
           const patIdx = song.positions[0] - 1;

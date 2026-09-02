@@ -44,13 +44,17 @@ function base64ToArrayBuffer(base64Uri) {
 }
 
 export class SoundfontVoice {
-  constructor(ctx, buffer, playbackRate, gain, destination, when) {
+  constructor(ctx, buffer, playbackRate, gain, destination, when, releaseTime = 0.030) {
     this.ctx = ctx;
     this.isEnded = false;
+    this.isStopping = false;
     this.startTime = when;
+    this.targetGain = Math.max(0.0001, gain);
+    this.releaseTime = releaseTime;
+    this._listeners = new Set();
 
     this.gainNode = ctx.createGain();
-    this.gainNode.gain.setValueAtTime(Math.max(0.0001, gain), when);
+    this.gainNode.gain.setValueAtTime(this.targetGain, when);
     this.gainNode.connect(destination);
 
     this.source = ctx.createBufferSource();
@@ -63,32 +67,66 @@ export class SoundfontVoice {
     };
 
     this.source.start(when);
+
+    // Natural end safeguard: buffer duration plus small margin
+    const durationSec = (buffer.duration / Math.max(0.25, playbackRate)) + 0.5;
+    const autoMs = Math.max(100, Math.round((when - ctx.currentTime + durationSec) * 1000));
+    if (autoMs < 20000) {
+      this._autoTimer = setTimeout(() => {
+        this.dispose();
+      }, autoMs);
+    }
   }
 
-  stop(stopWhen = this.ctx.currentTime) {
-    if (this.isEnded) return;
+  onEnded(callback) {
+    if (typeof callback !== 'function') return;
+    if (this.isEnded) {
+      try { callback(this); } catch { /* ignore */ }
+    } else {
+      this._listeners.add(callback);
+    }
+  }
+
+  stop(stopWhen = this.ctx.currentTime, customReleaseTime) {
+    if (this.isEnded || this.isStopping) return;
+    this.isStopping = true;
     const now = this.ctx.currentTime;
     const stopAt = Math.max(now, stopWhen);
-    const releaseTime = 0.05;
+    const releaseTime = customReleaseTime || this.releaseTime || 0.030;
     const releaseEnd = stopAt + releaseTime;
 
     try {
       this.gainNode.gain.cancelScheduledValues(stopAt);
-      this.gainNode.gain.setTargetAtTime(0.0001, stopAt, releaseTime / 3);
-      this.source.stop(releaseEnd + 0.02);
+      const currentGain = Math.max(0.0001, this.gainNode.gain.value);
+      this.gainNode.gain.setValueAtTime(currentGain, stopAt);
+      this.gainNode.gain.linearRampToValueAtTime(0.0001, releaseEnd);
+      this.source.stop(releaseEnd + 0.005);
     } catch {
       try { this.source.stop(stopAt); } catch { /* ignore */ }
     }
+
+    // Safety fallback timer to ensure cleanup runs
+    const safetyMs = Math.max(20, Math.round((releaseEnd + 0.01 - now) * 1000));
+    setTimeout(() => {
+      this.dispose();
+    }, safetyMs);
   }
 
   dispose() {
     if (this.isEnded) return;
     this.isEnded = true;
+    if (this._autoTimer) {
+      clearTimeout(this._autoTimer);
+      this._autoTimer = null;
+    }
     try {
       this.source.disconnect();
       this.gainNode.disconnect();
     } catch { /* ignore */ }
-    this.onended?.();
+    for (const listener of this._listeners) {
+      try { listener(this); } catch { /* ignore */ }
+    }
+    this._listeners.clear();
   }
 }
 
@@ -98,7 +136,30 @@ export class SoundfontEngine {
     this._instruments = new Map(); // program -> Map<midiNote, AudioBuffer>
     this._loading = new Map();     // program -> Promise<Map<midiNote, AudioBuffer>>
     this._activeVoices = new Set();
-    this._maxGlobalVoices = 160;    // Generous headroom for lookahead scheduling buffer
+    this._maxGlobalVoices = 256;   // High emergency safety ceiling
+    this.speed = 8;
+    this.currentReleaseTime = 0.030; // 30ms baseline at speed 8 (twice the previous 15ms)
+  }
+
+  /**
+   * Update speed and calculate release time.
+   * Speed 8 = 30ms (baseline).
+   * More speed = shorter step interval = earlier cutoff (e.g. speed 9 -> 15ms).
+   * Less speed = longer step interval = longer cutoff (e.g. speed 6 -> 60ms).
+   * @param {number} speed Tracker speed (1..9)
+   */
+  setSpeed(speed) {
+    const s = Math.max(1, Math.min(9, Number(speed) || 8));
+    this.speed = s;
+    this.currentReleaseTime = Math.max(0.010, (10 - s) * 0.015);
+  }
+
+  get activeVoiceCount() {
+    let count = 0;
+    for (const v of this._activeVoices) {
+      if (!v.isEnded && !v.isStopping) count++;
+    }
+    return count;
   }
 
   /**
@@ -117,7 +178,12 @@ export class SoundfontEngine {
     const sample = this._getSample(buffers, note);
     if (!sample) return null;
 
-    // Safety global polyphony cap with voice stealing (only triggers if massive pileup occurs)
+    // Prune ended voices
+    for (const v of this._activeVoices) {
+      if (v.isEnded) this._activeVoices.delete(v);
+    }
+
+    // Emergency global polyphony cap with voice stealing
     if (this._activeVoices.size >= this._maxGlobalVoices) {
       let oldestVoice = null;
       let oldestTime = Infinity;
@@ -128,18 +194,18 @@ export class SoundfontEngine {
         }
       }
       if (oldestVoice) {
-        oldestVoice.stop(when);
+        oldestVoice.stop(this.ctx.currentTime, this.currentReleaseTime);
         this._activeVoices.delete(oldestVoice);
       }
     }
 
-    const gain = (velocity / 127) * 1.05;
-    const voice = new SoundfontVoice(this.ctx, sample.buffer, sample.playbackRate, gain, destination, when);
+    const gain = velocity / 127;
+    const voice = new SoundfontVoice(this.ctx, sample.buffer, sample.playbackRate, gain, destination, when, this.currentReleaseTime);
 
     this._activeVoices.add(voice);
-    voice.onended = () => {
+    voice.onEnded(() => {
       this._activeVoices.delete(voice);
-    };
+    });
 
     return voice;
   }
@@ -227,7 +293,7 @@ export class SoundfontEngine {
 
   stopAll(when = this.ctx.currentTime) {
     for (const v of this._activeVoices) {
-      v.stop(when);
+      v.stop(when, this.currentReleaseTime);
     }
     this._activeVoices.clear();
   }

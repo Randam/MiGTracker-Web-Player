@@ -1123,6 +1123,12 @@ export class MIDISynth {
     }
   }
 
+  setSpeed(speed) {
+    const s = Math.max(1, Math.min(9, Number(speed) || 8));
+    this._speed = s;
+    this._soundfontEngine?.setSpeed(s);
+  }
+
   get soundfontBank() {
     return this._soundfontBank;
   }
@@ -1226,9 +1232,9 @@ export class MIDISynth {
    * @param {number} velocity 0–127
    * @param {number} [time]   AudioContext time (0 = now)
    */
-  async noteOn(channel, note, velocity, time = 0) {
+  async noteOn(channel, note, velocity, time = 0, trackerCh = 0) {
     if (velocity === 0) {
-      this.noteOff(channel, note, time);
+      this.noteOff(channel, note, time, trackerCh);
       return;
     }
 
@@ -1248,7 +1254,24 @@ export class MIDISynth {
       }
       this._lastDrumNotes.set(note, when);
 
+      // In MiGTracker, there are exactly 2 drum tracks: Track 16 (DR1) and Track 17 (DR2).
+      // Each drum track is strictly monophonic (at most 1 active drum voice per track).
+      const drumSlot = trackerCh === 17 ? 1 : 0;
+      if (!this._activeDrumSlots) this._activeDrumSlots = [null, null];
+
+      // Stop previous drum sound on this drum track
+      if (this._activeDrumSlots[drumSlot]) {
+        this._activeDrumSlots[drumSlot]?.stop?.(when);
+        this._activeDrumSlots[drumSlot] = null;
+      }
+
       if (this.isCurrentBankSF2 && this._sf2Engine?.isLoaded) {
+        this._activeDrumSlots[drumSlot] = { time: when, stop: () => {} };
+        setTimeout(() => {
+          if (this._activeDrumSlots[drumSlot]?.time === when) {
+            this._activeDrumSlots[drumSlot] = null;
+          }
+        }, 500);
         this._sf2Engine.noteOn(9, note, velocity);
         return;
       }
@@ -1264,9 +1287,18 @@ export class MIDISynth {
         }
         return;
       }
+
       if (this._percussionMode === 'soundfont' && !this.isCurrentBankSynth && this._soundfontEngine) {
         const voice = this._soundfontEngine.playNote(128, note, velocity, when, ch.gain);
-        if (voice) return;
+        if (voice) {
+          this._activeDrumSlots[drumSlot] = voice;
+          voice.onEnded(() => {
+            if (this._activeDrumSlots[drumSlot] === voice) {
+              this._activeDrumSlots[drumSlot] = null;
+            }
+          });
+          return;
+        }
       }
       // Built-in GM drum synthesizer (fallback or OPL3/synth mode)
       if (this._drumSynth) {
@@ -1279,11 +1311,17 @@ export class MIDISynth {
 
     // ── SF2 AudioWorklet Synthesizer Mode (Yamaha_XG_Sound_Set.sf2) ─────────
     if (this.isCurrentBankSF2 && this._sf2Engine?.isLoaded) {
+      ch.activeNotes.clear();
+      ch.activeNotes.set(note, { note, time: when });
       this._sf2Engine.noteOn(channel, note, velocity);
       return;
     }
 
     if (this.isCurrentBankSF2 && this._sf2Synth?.isLoaded) {
+      for (const [activeNote, activeNode] of ch.activeNotes) {
+        activeNode?.stop?.(when);
+      }
+      ch.activeNotes.clear();
       const node = this._sf2Synth.playNote(channel, ch.program, note, velocity, when, ch.gain);
       if (node) ch.activeNotes.set(note, node);
       return;
@@ -1291,6 +1329,10 @@ export class MIDISynth {
 
     // ── OPL3 FM Synthesizer Mode ─────────────────────────────────────────────
     if (this.isCurrentBankSynth && this._opl3Synth) {
+      for (const [activeNote, activeNode] of ch.activeNotes) {
+        activeNode?.stop?.(when);
+      }
+      ch.activeNotes.clear();
       const node = this._opl3Synth.playNote(ch.program, note, when, gain, ch.gain);
       if (node) ch.activeNotes.set(note, node);
       return;
@@ -1303,49 +1345,22 @@ export class MIDISynth {
       this._preload(ch.program).catch(() => {});
     }
 
-    const shouldLoop = isSustainedGMProgram(ch.program);
-
-    // Voice management per tracker channel:
-    // 1. For sustained/looping instruments (Strings, Flute, Organ, Brass, Pads, etc.),
-    //    stop any previous notes on this channel so they don't loop forever in background.
-    if (shouldLoop) {
-      for (const [activeNote, voice] of ch.activeNotes) {
-        voice?.stop?.(when);
-      }
-      ch.activeNotes.clear();
-    } else {
-      // 2. For decaying instruments (Piano, Guitar, etc.):
-      //    If the exact same note is already playing on this channel, stop previous instance.
-      if (ch.activeNotes.has(note)) {
-        ch.activeNotes.get(note)?.stop?.(when);
-        ch.activeNotes.delete(note);
-      }
-      //    Cap decaying polyphony per channel to max 2 voices.
-      if (ch.activeNotes.size >= 2) {
-        let oldestNote = null;
-        let oldestTime = Infinity;
-        for (const [n, v] of ch.activeNotes) {
-          const t = v.startTime || 0;
-          if (t < oldestTime) {
-            oldestTime = t;
-            oldestNote = n;
-          }
-        }
-        if (oldestNote !== null) {
-          ch.activeNotes.get(oldestNote)?.stop?.(when);
-          ch.activeNotes.delete(oldestNote);
-        }
-      }
+    // ── Strict Tracker Rule: Exactly 1 note per channel at a time! ───────────
+    // In MiGTracker, all channels are strictly monophonic.
+    // When a new note starts, the previous note on this channel is stopped immediately.
+    for (const [activeNote, voice] of ch.activeNotes) {
+      voice?.stop?.(when);
     }
+    ch.activeNotes.clear();
 
     const voice = this._soundfontEngine.playNote(ch.program, note, velocity, when, ch.gain);
     if (voice) {
       ch.activeNotes.set(note, voice);
-      voice.onended = () => {
+      voice.onEnded(() => {
         if (ch.activeNotes.get(note) === voice) {
           ch.activeNotes.delete(note);
         }
-      };
+      });
     }
   }
 
@@ -1354,13 +1369,23 @@ export class MIDISynth {
    * @param {number} channel
    * @param {number} [note]
    * @param {number} [time]
+   * @param {number} [trackerCh]
    */
-  noteOff(channel, note, time = 0) {
+  noteOff(channel, note, time = 0, trackerCh = 0) {
     if (this.isCurrentBankSF2 && this._sf2Engine?.isLoaded) {
+      const ch = this._channels[channel];
+      if (ch) ch.activeNotes.clear();
       this._sf2Engine.noteOff(channel, note);
       return;
     }
-    if (channel === 9 && (this._percussionMode === 'synth' || this.isCurrentBankSynth)) return;
+    if (channel === 9) {
+      const drumSlot = trackerCh === 17 ? 1 : 0;
+      if (this._activeDrumSlots && this._activeDrumSlots[drumSlot]) {
+        this._activeDrumSlots[drumSlot]?.stop?.(time || this._ctx.currentTime);
+        this._activeDrumSlots[drumSlot] = null;
+      }
+      return;
+    }
     const ch = this._channels[channel];
     if (!ch) return;
     this._stopNote(ch, note, time || this._ctx.currentTime);
@@ -1369,16 +1394,11 @@ export class MIDISynth {
   _stopNote(ch, note, when) {
     const stopAt = Math.max(this._ctx?.currentTime || 0, when || 0);
 
-    if (note !== undefined && ch.activeNotes.has(note)) {
-      const voice = ch.activeNotes.get(note);
+    // In MiGTracker, stopping a channel stops any active note on that channel
+    for (const [n, voice] of ch.activeNotes) {
       voice?.stop?.(stopAt);
-      ch.activeNotes.delete(note);
-    } else if (note === undefined) {
-      for (const [n, voice] of ch.activeNotes) {
-        voice?.stop?.(stopAt);
-      }
-      ch.activeNotes.clear();
     }
+    ch.activeNotes.clear();
   }
 
   /** Send MIDI CC (Control Change). */
@@ -1472,6 +1492,12 @@ export class MIDISynth {
       }
     }
 
+    if (this._activeDrumSlots) {
+      this._activeDrumSlots[0]?.stop?.(stopTime);
+      this._activeDrumSlots[1]?.stop?.(stopTime);
+      this._activeDrumSlots = [null, null];
+    }
+
     // 3. Fast fade-out on master gain
     if (this._masterGain) {
       this._masterGain.gain.cancelScheduledValues(now);
@@ -1502,6 +1528,7 @@ export class MIDISynth {
     this.silenceAll(0);
     this._soundfontEngine?.clear();
     this._lastDrumNotes?.clear();
+    this._activeDrumSlots = [null, null];
 
     if (this._ctx) {
       const now = this._ctx.currentTime;
@@ -1534,6 +1561,18 @@ export class MIDISynth {
 
   getMasterVolume() {
     return this._masterGain ? this._masterGain.gain.value : 1;
+  }
+
+  get activeVoiceCount() {
+    let count = 0;
+    for (let i = 0; i < 16; i++) {
+      if (this._channels[i]?.activeNotes?.size > 0) count++;
+    }
+    if (this._activeDrumSlots) {
+      if (this._activeDrumSlots[0]) count++;
+      if (this._activeDrumSlots[1]) count++;
+    }
+    return count;
   }
 
   /**

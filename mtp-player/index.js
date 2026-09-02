@@ -165,6 +165,7 @@ export class MTPPlayer extends EventTarget {
     if (wasPlaying) this._stopScheduler();
     this._song      = song;
     this._sequencer = new MTPSequencer(song);
+    this._synth.setSpeed(song.startspeed || 8);
     this._synth.silenceAll();
 
     // Pre-warm all instruments and voice changes if audio engine is already initialised
@@ -356,6 +357,7 @@ export class MTPPlayer extends EventTarget {
   get audioContext()    { return this._ctx; }
   get lookahead()       { return this._lookahead; }
   set lookahead(sec)    { this._lookahead = Math.max(0.05, Math.min(2.0, sec)); }
+  get activeVoiceCount() { return this._synth?.activeVoiceCount || 0; }
 
   // ── High-Precision Buffered Lookahead Scheduler ─────────────────────────────
 
@@ -455,16 +457,19 @@ export class MTPPlayer extends EventTarget {
   _dispatchMIDI(ev, time) {
     switch (ev.type) {
       case 'noteOn':
-        this._synth.noteOn(ev.channel, ev.note, ev.velocity, time);
+        this._synth.noteOn(ev.channel, ev.note, ev.velocity, time, ev.trackerCh);
         break;
       case 'noteOff':
-        this._synth.noteOff(ev.channel, ev.note, time);
+        this._synth.noteOff(ev.channel, ev.note, time, ev.trackerCh);
         break;
       case 'programChange':
         this._synth.programChange(ev.channel, ev.program);
         break;
       case 'cc':
         this._synth.controlChange(ev.channel, ev.cc, ev.value, time);
+        break;
+      case 'speed':
+        this._synth.setSpeed(ev.speed);
         break;
     }
   }
