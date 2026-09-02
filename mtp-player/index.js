@@ -190,9 +190,6 @@ export class MTPPlayer extends EventTarget {
     if (this._song) {
       const programs = this._extractSongPrograms(this._song);
       await this._synth.preloadPrograms(programs, (info) => this._emit('loading-progress', info));
-      if (this._synth._loading.size > 0) {
-        await Promise.allSettled([...this._synth._loading.values()]);
-      }
     }
 
     if (!this._paused) this._sequencer.reset();
@@ -307,9 +304,6 @@ export class MTPPlayer extends EventTarget {
     if (this._song && this._initialized) {
       const programs = this._extractSongPrograms(this._song);
       await this._synth.preloadPrograms(programs, (info) => this._emit('loading-progress', info));
-      if (this._synth._loading.size > 0) {
-        await Promise.allSettled([...this._synth._loading.values()]);
-      }
     }
   }
 
@@ -421,13 +415,13 @@ export class MTPPlayer extends EventTarget {
       const delayMs = Math.max(0, (tickTime - this._ctx.currentTime) * 1000);
 
       if (delayMs <= 6) {
-        for (const ev of events) this._dispatchMIDI(ev);
+        for (const ev of events) this._dispatchMIDI(ev, tickTime);
         this._emit('step', { position, step, track, events });
       } else {
         const timerId = setTimeout(() => {
           this._pendingStepTimers?.delete(timerId);
           if (!this._playing) return;
-          for (const ev of events) this._dispatchMIDI(ev);
+          for (const ev of events) this._dispatchMIDI(ev, tickTime);
           this._emit('step', { position, step, track, events });
         }, delayMs);
         if (!this._pendingStepTimers) this._pendingStepTimers = new Set();

@@ -15,6 +15,7 @@
 
 import { SF2Synth } from './SF2Synth.js';
 import { SpessaSynthEngine } from './SpessaSynthEngine.js';
+import { SoundfontEngine } from './SoundfontEngine.js';
 
 export const SOUNDFONT_BANKS = {
   av_8mb: {
@@ -967,16 +968,14 @@ export class MIDISynth {
     this._soundfontBank   = SOUNDFONT_BANKS[soundfontBank] ? soundfontBank : 'av_8mb';
     this._soundfontFormat = soundfontFormat;
     this._percussionMode  = percussionMode;
-    this._SF              = null;  // soundfont-player library reference
+    this._soundfontEngine = null;  // Native leak-free Web Audio SoundFont engine
     this._ctx             = null;  // AudioContext
     this._masterGain      = null;  // master output gain
     this._masterLimiter   = null;  // master dynamics peak limiter
     this._masterVolume    = masterVolume;
-    this._players         = new Map();  // GM program → soundfont player instance
-    this._channels        = [];         // per-channel state
-    this._loading         = new Map();  // in-flight load promises (dedup)
-    this._drumSynth       = null;       // built-in GM drum synthesizer
-    this._opl3Synth       = null;       // real-time OPL3 FM synthesizer
+    this._channels        = [];    // per-channel state
+    this._drumSynth       = null;  // built-in GM drum synthesizer
+    this._opl3Synth       = null;  // real-time OPL3 FM synthesizer
 
     // Hardware DSP filter & DAC nodes
     this._dspHighpass     = null;
@@ -1040,12 +1039,12 @@ export class MIDISynth {
 
     this._applyBankDSP(this._soundfontBank);
 
-    this._drumSynth = new GMDrumSynth(this._ctx);
-    this._opl3Synth = new OPL3Synth(this._ctx);
-    this._sf2Synth  = new SF2Synth(this._ctx);
-    this._sf2Engine = new SpessaSynthEngine(this._ctx);
+    this._drumSynth       = new GMDrumSynth(this._ctx);
+    this._opl3Synth       = new OPL3Synth(this._ctx);
+    this._sf2Synth        = new SF2Synth(this._ctx);
+    this._sf2Engine       = new SpessaSynthEngine(this._ctx);
     this._sf2Engine.connect(this._dspHighpass);
-    this._SF = await this._resolveSoundfontLib();
+    this._soundfontEngine = new SoundfontEngine(this._ctx);
 
     // 16 MIDI channels: each has its own gain node connected into the DSP Chain
     for (let i = 0; i < 16; i++) {
@@ -1057,7 +1056,7 @@ export class MIDISynth {
         program:     i === 9 ? 128 : 0, // ch 9 fixed = GM percussion (program 128)
         volume:      1.0,
         pan:         0,                  // stereo pan −1..+1
-        activeNotes: new Map(),          // note → { node, stopFn }
+        activeNotes: new Map(),          // note → voice
         gain:        channelGain,
       };
     }
@@ -1069,22 +1068,6 @@ export class MIDISynth {
     if (this._percussionMode === 'soundfont' && !this.isCurrentBankSynth) {
       this._preload(128).catch(() => {});
     }
-  }
-
-  /** Try to locate the soundfont-player library. */
-  async _resolveSoundfontLib() {
-    if (typeof globalThis.Soundfont !== 'undefined') return globalThis.Soundfont;
-
-    try {
-      const mod = await import('soundfont-player');
-      return mod.default || mod;
-    } catch { /* not installed as npm dep */ }
-
-    throw new Error(
-      'MIDISynth: soundfont-player not found.\n' +
-      '  Standalone player: add <script src="https://cdn.jsdelivr.net/npm/soundfont-player/dist/soundfont-player.min.js"></script>\n' +
-      '  Vite/npm project: run  npm install soundfont-player'
-    );
   }
 
   // ── SoundFont Bank & DSP Selection ──────────────────────────────────────────
@@ -1133,8 +1116,7 @@ export class MIDISynth {
     console.log(`[MIDISynth]  ℹ Sound Engine: ${bank.isSynth ? 'Real-time Web Audio OPL3 FM Synthesizer' : bank.baseUrl}`);
 
     this._applyBankDSP(bankKey);
-    this._players.clear();
-    this._loading.clear();
+    this._soundfontEngine?.clear();
 
     if (this._percussionMode === 'soundfont' && !this.isCurrentBankSynth) {
       this._preload(128).catch(() => {});
@@ -1199,16 +1181,13 @@ export class MIDISynth {
    */
   async _getPlayer(program) {
     if (this.isCurrentBankSynth || this.isCurrentBankSF2) return null;
-    if (this._players.has(program)) return this._players.get(program);
     return this._preload(program);
   }
 
   /** Pre-load an instrument in the background (deduplicates concurrent requests). */
   _preload(program) {
     if (this.isCurrentBankSynth || this.isCurrentBankSF2) return Promise.resolve(null);
-    if (!this._SF || !this._ctx) return Promise.resolve(null);
-    if (this._loading.has(program)) return this._loading.get(program);
-    if (this._players.has(program)) return Promise.resolve(this._players.get(program));
+    if (!this._soundfontEngine || !this._ctx) return Promise.resolve(null);
 
     const isPercussion = (program === 128);
     const name = isPercussion ? 'percussion' : (GM_NAMES[program] ?? GM_NAMES[0]);
@@ -1217,31 +1196,7 @@ export class MIDISynth {
       ? `https://paulrosen.github.io/midi-js-soundfonts/FluidR3_GM/percussion-${this._soundfontFormat}.js`
       : `${bank.baseUrl}${name}-${this._soundfontFormat}.js`;
 
-    console.log(`[MIDISynth] ⏳ Loading instrument [Prog ${program}: "${name}"] from ${url}...`);
-
-    const loadPromise = this._SF.instrument(this._ctx, name, {
-      soundfont: bank.id,
-      format:    this._soundfontFormat,
-      nameToUrl: () => url,
-    });
-
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`Timeout loading instrument [${name}] after 10s`)), 10000)
-    );
-
-    const promise = Promise.race([loadPromise, timeoutPromise]).then(player => {
-      this._players.set(program, player);
-      this._loading.delete(program);
-      console.log(`%c[MIDISynth]  ✓ Loaded instrument [Prog ${program}: "${name}"] successfully for "${bank.name}"`, 'color:#39ff14');
-      return player;
-    }).catch(err => {
-      this._loading.delete(program);
-      console.error(`[MIDISynth]  ✗ Could not load soundfont instrument [Prog ${program}: "${name}"] from ${url}:`, err.message);
-      return null;
-    });
-
-    this._loading.set(program, promise);
-    return promise;
+    return this._soundfontEngine.loadInstrument(program, url);
   }
 
   // ── Percussion Mode ──────────────────────────────────────────────────────────
@@ -1272,6 +1227,11 @@ export class MIDISynth {
    * @param {number} [time]   AudioContext time (0 = now)
    */
   async noteOn(channel, note, velocity, time = 0) {
+    if (velocity === 0) {
+      this.noteOff(channel, note, time);
+      return;
+    }
+
     const ch = this._channels[channel];
     if (!ch) return;
 
@@ -1304,21 +1264,9 @@ export class MIDISynth {
         }
         return;
       }
-      if (this._percussionMode === 'soundfont' && !this.isCurrentBankSynth) {
-        const drumPlayer = this._players.get(128);
-        if (drumPlayer) {
-          const node = drumPlayer.play(note, when, { gain, loop: false, destination: ch.gain });
-          if (node?.source) {
-            node.source.onended = () => {
-              try {
-                node.disconnect();
-                node.source.disconnect();
-                node.env?.disconnect?.();
-              } catch { /* already disconnected */ }
-            };
-          }
-          return;
-        }
+      if (this._percussionMode === 'soundfont' && !this.isCurrentBankSynth && this._soundfontEngine) {
+        const voice = this._soundfontEngine.playNote(128, note, velocity, when, ch.gain);
+        if (voice) return;
       }
       // Built-in GM drum synthesizer (fallback or OPL3/synth mode)
       if (this._drumSynth) {
@@ -1328,8 +1276,6 @@ export class MIDISynth {
     }
 
     // ── Melodic tracker channels ─────────────────────────────────────────────
-    // Note: MiGTracker relies on standard MIDI polyphony to let notes (like pianos) ring out naturally
-    // when mode=false (no forced legato cutoff). We do NOT aggressively stop the previous note here.
 
     // ── SF2 AudioWorklet Synthesizer Mode (Yamaha_XG_Sound_Set.sf2) ─────────
     if (this.isCurrentBankSF2 && this._sf2Engine?.isLoaded) {
@@ -1350,35 +1296,56 @@ export class MIDISynth {
       return;
     }
 
-    // ── Melodic instrument channels (0..8, 10..15) — SoundFont ───────────────
-    let player = this._players.get(ch.program);
-    if (!player) {
+    // ── Melodic tracker channels (0..8, 10..15) — Native SoundFont Engine ────
+    if (!this._soundfontEngine) return;
+
+    if (!this._soundfontEngine.isLoaded(ch.program)) {
       this._preload(ch.program).catch(() => {});
-      player = this._players.get(0); // fallback to piano if loading
     }
-    if (!player) return;
 
-    // Play note with intelligent looping for sustained instruments (Strings, Flutes, Brass, Organs, Pads)
     const shouldLoop = isSustainedGMProgram(ch.program);
-    const playOpts = {
-      gain,
-      destination: ch.gain,
-      loop: shouldLoop,
-      loopStart: shouldLoop ? 0.6 : 0,
-    };
 
-    const node = player.play(note, when, playOpts);
-    if (node) {
-      if (node.source) {
-        node.source.onended = () => {
-          try {
-            node.disconnect();
-            node.source.disconnect();
-            node.env?.disconnect?.();
-          } catch { /* already disconnected */ }
-        };
+    // Voice management per tracker channel:
+    // 1. For sustained/looping instruments (Strings, Flute, Organ, Brass, Pads, etc.),
+    //    stop any previous notes on this channel so they don't loop forever in background.
+    if (shouldLoop) {
+      for (const [activeNote, voice] of ch.activeNotes) {
+        voice?.stop?.(when);
       }
-      ch.activeNotes.set(note, node);
+      ch.activeNotes.clear();
+    } else {
+      // 2. For decaying instruments (Piano, Guitar, etc.):
+      //    If the exact same note is already playing on this channel, stop previous instance.
+      if (ch.activeNotes.has(note)) {
+        ch.activeNotes.get(note)?.stop?.(when);
+        ch.activeNotes.delete(note);
+      }
+      //    Cap decaying polyphony per channel to max 2 voices.
+      if (ch.activeNotes.size >= 2) {
+        let oldestNote = null;
+        let oldestTime = Infinity;
+        for (const [n, v] of ch.activeNotes) {
+          const t = v.startTime || 0;
+          if (t < oldestTime) {
+            oldestTime = t;
+            oldestNote = n;
+          }
+        }
+        if (oldestNote !== null) {
+          ch.activeNotes.get(oldestNote)?.stop?.(when);
+          ch.activeNotes.delete(oldestNote);
+        }
+      }
+    }
+
+    const voice = this._soundfontEngine.playNote(ch.program, note, velocity, when, ch.gain);
+    if (voice) {
+      ch.activeNotes.set(note, voice);
+      voice.onended = () => {
+        if (ch.activeNotes.get(note) === voice) {
+          ch.activeNotes.delete(note);
+        }
+      };
     }
   }
 
@@ -1400,26 +1367,15 @@ export class MIDISynth {
   }
 
   _stopNote(ch, note, when) {
-    const stopAt = Math.max(this._ctx.currentTime, when);
-
-    const cleanupNode = (node) => {
-      if (!node) return;
-      try { node.stop?.(stopAt); } catch { /* ignore */ }
-      setTimeout(() => {
-        try {
-          node.disconnect?.();
-          node.source?.disconnect?.();
-          node.env?.disconnect?.();
-        } catch { /* ignore */ }
-      }, Math.max(50, (stopAt - this._ctx.currentTime) * 1000 + 100));
-    };
+    const stopAt = Math.max(this._ctx?.currentTime || 0, when || 0);
 
     if (note !== undefined && ch.activeNotes.has(note)) {
-      cleanupNode(ch.activeNotes.get(note));
+      const voice = ch.activeNotes.get(note);
+      voice?.stop?.(stopAt);
       ch.activeNotes.delete(note);
-    } else {
-      for (const [n, node] of ch.activeNotes) {
-        cleanupNode(node);
+    } else if (note === undefined) {
+      for (const [n, voice] of ch.activeNotes) {
+        voice?.stop?.(stopAt);
       }
       ch.activeNotes.clear();
     }
@@ -1458,7 +1414,10 @@ export class MIDISynth {
     if (channel === 9) return;
     const ch = this._channels[channel];
     if (!ch) return;
-    ch.program = program;
+    if (ch.program !== program) {
+      this.silenceChannel(channel);
+      ch.program = program;
+    }
     if (this.isCurrentBankSF2 && this._sf2Engine?.isLoaded) {
       this._sf2Engine.programChange(channel, program);
       return;
@@ -1494,10 +1453,8 @@ export class MIDISynth {
     const fadeSec = Math.max(0.005, fastFadeMs / 1000);
     const stopTime = now + fadeSec;
 
-    // 1. Tell soundfont-player to immediately cancel and stop ALL tracked/buffered notes across all instruments
-    for (const player of this._players.values()) {
-      try { player.stop?.(stopTime); } catch { /* ignore */ }
-    }
+    // 1. Tell soundfont engine to immediately cancel and stop ALL active voices
+    this._soundfontEngine?.stopAll(stopTime);
 
     // 2. Fast fade-out on every channel gain and stop active node handles
     for (let i = 0; i < 16; i++) {
@@ -1508,9 +1465,8 @@ export class MIDISynth {
           ch.gain.gain.setValueAtTime(ch.gain.gain.value, now);
           ch.gain.gain.exponentialRampToValueAtTime(0.0001, stopTime);
         }
-        for (const [note, node] of ch.activeNotes) {
-          try { node.stop?.(stopTime); } catch { /* ignore */ }
-          try { node.source?.stop?.(stopTime); } catch { /* ignore */ }
+        for (const [note, voice] of ch.activeNotes) {
+          voice?.stop?.(stopTime);
         }
         ch.activeNotes.clear();
       }
@@ -1544,11 +1500,7 @@ export class MIDISynth {
   /** Completely reset MIDI synth state, voices, controllers, and cached soundfont instances. */
   resetGM() {
     this.silenceAll(0);
-    for (const player of this._players.values()) {
-      try { player.stop?.(); } catch { /* ignore */ }
-    }
-    this._players.clear();
-    this._loading.clear();
+    this._soundfontEngine?.clear();
     this._lastDrumNotes?.clear();
 
     if (this._ctx) {
